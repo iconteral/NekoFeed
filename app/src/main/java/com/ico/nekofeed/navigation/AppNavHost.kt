@@ -1,16 +1,11 @@
 package com.ico.nekofeed.navigation
 
 import android.net.Uri
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -20,34 +15,123 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.ico.nekofeed.data.repository.AuthRepository
+import com.ico.nekofeed.data.repository.UserRepository
+import com.ico.nekofeed.ui.auth.AuthViewModel
+import com.ico.nekofeed.ui.auth.LoginScreen
+import com.ico.nekofeed.ui.auth.RegisterScreen
 import com.ico.nekofeed.ui.components.NekoFeedBottomNavigationBar
 import com.ico.nekofeed.ui.components.bottomNavItems
 import com.ico.nekofeed.ui.detail.FeedDetailScreen
 import com.ico.nekofeed.ui.feed.FeedScreen
 import com.ico.nekofeed.ui.feed.FeedViewModel
+import com.ico.nekofeed.ui.profile.ProfileScreen
 import com.ico.nekofeed.ui.search.SearchScreen
 import com.ico.nekofeed.ui.stats.StatsScreen
-import com.ico.nekofeed.ui.stats.StatsData
-import androidx.compose.ui.tooling.preview.Preview
 
 @Composable
 fun AppNavHost(
+    authRepository: AuthRepository,
+    userRepository: UserRepository,
     navController: NavHostController = rememberNavController()
 ) {
     val feedViewModel: FeedViewModel = viewModel()
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = navBackStackEntry?.destination?.route ?: "feed"
+    val authViewModel: AuthViewModel = viewModel { AuthViewModel(authRepository) }
+    val authState by authViewModel.uiState.collectAsState()
 
-    // 判断是否显示底部导航栏
+    NavHost(
+        navController = navController,
+        startDestination = "main"
+    ) {
+        // Login
+        composable("login") {
+            LoginScreen(
+                viewModel = authViewModel,
+                onLoginSuccess = {
+                    navController.navigate("profile") {
+                        popUpTo("login") { inclusive = true }
+                    }
+                },
+                onNavigateToRegister = {
+                    navController.navigate("register")
+                }
+            )
+        }
+
+        // Register
+        composable("register") {
+            RegisterScreen(
+                viewModel = authViewModel,
+                onRegisterSuccess = {
+                    navController.navigate("profile") {
+                        popUpTo("register") { inclusive = true }
+                    }
+                },
+                onNavigateToLogin = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        // Main app with bottom navigation
+        composable("main") {
+            MainScreen(
+                feedViewModel = feedViewModel,
+                authViewModel = authViewModel,
+                navController = navController
+            )
+        }
+
+        // Profile (outside main for direct navigation)
+        composable("profile") {
+            if (authState.isLoggedIn) {
+                ProfileScreen(
+                    authViewModel = authViewModel,
+                    onLogout = {
+                        navController.navigate("main") {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    },
+                    onNavigateToLikes = { },
+                    onNavigateToCollections = { },
+                    onNavigateToHistory = { },
+                    onBack = { navController.popBackStack() }
+                )
+            } else {
+                LoginScreen(
+                    viewModel = authViewModel,
+                    onLoginSuccess = {
+                        navController.navigate("profile") {
+                            popUpTo("login") { inclusive = true }
+                        }
+                    },
+                    onNavigateToRegister = {
+                        navController.navigate("register")
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MainScreen(
+    feedViewModel: FeedViewModel,
+    authViewModel: AuthViewModel,
+    navController: NavHostController
+) {
+    val nestedNavController = rememberNavController()
+    val navBackStackEntry by nestedNavController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route ?: "feed"
     val showBottomBar = currentRoute in bottomNavItems.map { it.route }
 
-    Scaffold(
+    androidx.compose.material3.Scaffold(
         bottomBar = {
             if (showBottomBar) {
                 NekoFeedBottomNavigationBar(
                     currentRoute = currentRoute,
                     onNavigate = { route ->
-                        navController.navigate(route) {
+                        nestedNavController.navigate(route) {
                             popUpTo("feed") { saveState = true }
                             launchSingleTop = true
                             restoreState = true
@@ -58,102 +142,85 @@ fun AppNavHost(
         }
     ) { paddingValues ->
         NavHost(
-            navController = navController,
+            navController = nestedNavController,
             startDestination = "feed",
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(
-                    bottom = paddingValues.calculateBottomPadding()
-                )
+            modifier = Modifier.padding(
+                bottom = paddingValues.calculateBottomPadding()
+            )
         ) {
-            // 首页
             composable("feed") {
                 FeedScreen(
                     viewModel = feedViewModel,
                     onItemClick = { itemId ->
                         val encodedId = Uri.encode(itemId)
-                        navController.navigate("detail/$encodedId")
+                        nestedNavController.navigate("detail/$encodedId")
                     },
                     onSearchClick = {
-                        navController.navigate("search")
+                        nestedNavController.navigate("search")
                     },
                     onStatsClick = {
-                        navController.navigate("stats")
+                        nestedNavController.navigate("stats")
                     }
                 )
             }
 
-            // 详情页
             composable(
                 route = "detail/{itemId}",
-                arguments = listOf(
-                    navArgument("itemId") {
-                        type = NavType.StringType
-                    }
-                )
+                arguments = listOf(navArgument("itemId") { type = NavType.StringType })
             ) { backStackEntry ->
                 val itemId = backStackEntry.arguments?.getString("itemId") ?: ""
                 val decodedId = Uri.decode(itemId)
-                val item = remember(decodedId) {
-                    feedViewModel.getItemById(decodedId)
-                }
+                val item = remember(decodedId) { feedViewModel.getItemById(decodedId) }
                 FeedDetailScreen(
                     item = item,
-                    onBack = { navController.popBackStack() },
+                    onBack = { nestedNavController.popBackStack() },
                     onLikeClick = { id -> feedViewModel.toggleLike(id) },
                     onCollectClick = { id -> feedViewModel.toggleCollect(id) },
                     onShareClick = { id -> feedViewModel.toggleShare(id) }
                 )
             }
 
-            // 搜索页
             composable("search") {
                 SearchScreen(
-                    onBack = { navController.popBackStack() },
+                    onBack = { nestedNavController.popBackStack() },
                     onItemClick = { itemId ->
                         val encodedId = Uri.encode(itemId)
-                        navController.navigate("detail/$encodedId")
+                        nestedNavController.navigate("detail/$encodedId")
                     },
-                    searchAds = { query ->
-                        feedViewModel.searchItems(query)
-                    }
+                    searchAds = { query -> feedViewModel.searchItems(query) }
                 )
             }
 
-            // 统计页
             composable("stats") {
                 StatsScreen(
-                    onBack = { navController.popBackStack() },
-                    getStats = {
-                        feedViewModel.getStats()
-                    },
+                    onBack = { nestedNavController.popBackStack() },
+                    getStats = { feedViewModel.getStats() },
                     onItemClick = { itemId ->
                         val encodedId = Uri.encode(itemId)
-                        navController.navigate("detail/$encodedId")
+                        nestedNavController.navigate("detail/$encodedId")
                     }
                 )
             }
 
-            // 个人页（占位）
             composable("profile") {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "个人中心 - 开发中",
-                        style = MaterialTheme.typography.titleLarge
+                val authState by authViewModel.uiState.collectAsState()
+                if (authState.isLoggedIn) {
+                    ProfileScreen(
+                        authViewModel = authViewModel,
+                        onLogout = {
+                            navController.navigate("main") {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        },
+                        onNavigateToLikes = { },
+                        onNavigateToCollections = { },
+                        onNavigateToHistory = { },
+                        onBack = { nestedNavController.popBackStack() }
                     )
+                } else {
+                    navController.navigate("login")
                 }
             }
         }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun PreviewAppNavHost() {
-    MaterialTheme {
-        AppNavHost()
     }
 }

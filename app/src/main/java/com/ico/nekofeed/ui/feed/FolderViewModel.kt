@@ -6,6 +6,7 @@ import com.ico.nekofeed.data.model.FeedCategory
 import com.ico.nekofeed.data.model.FeedItem
 import com.ico.nekofeed.data.remote.RetrofitClient
 import com.ico.nekofeed.data.repository.FeedRepository
+import com.ico.nekofeed.data.repository.UserRepository
 import com.ico.nekofeed.util.FeedUiState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,11 +16,11 @@ import kotlinx.coroutines.launch
 
 class FeedViewModel : ViewModel() {
     private val repository = FeedRepository(RetrofitClient.feedApi)
+    private val userRepository = UserRepository(RetrofitClient.feedApi)
 
     private val _uiState = MutableStateFlow(FeedUiState())
     val uiState: StateFlow<FeedUiState> = _uiState.asStateFlow()
 
-    // 缓存所有数据用于频道过滤
     private var allItems: List<FeedItem> = emptyList()
 
     init {
@@ -105,27 +106,65 @@ class FeedViewModel : ViewModel() {
     }
 
     fun toggleLike(itemId: String) {
-        allItems = allItems.map { item ->
-            if (item.id == itemId) {
-                item.copy(
-                    isLiked = !item.isLiked,
-                    likeCount = if (item.isLiked) item.likeCount - 1 else item.likeCount + 1
-                )
-            } else item
+        viewModelScope.launch {
+            userRepository.toggleLike(itemId).fold(
+                onSuccess = { interaction ->
+                    allItems = allItems.map { item ->
+                        if (item.id == itemId) {
+                            item.copy(
+                                isLiked = interaction.isLiked,
+                                likeCount = interaction.likeCount,
+                                isCollected = interaction.isCollected,
+                                collectCount = interaction.collectCount
+                            )
+                        } else item
+                    }
+                    updateFilteredItems()
+                },
+                onFailure = {
+                    allItems = allItems.map { item ->
+                        if (item.id == itemId) {
+                            item.copy(
+                                isLiked = !item.isLiked,
+                                likeCount = if (item.isLiked) item.likeCount - 1 else item.likeCount + 1
+                            )
+                        } else item
+                    }
+                    updateFilteredItems()
+                }
+            )
         }
-        updateFilteredItems()
     }
 
     fun toggleCollect(itemId: String) {
-        allItems = allItems.map { item ->
-            if (item.id == itemId) {
-                item.copy(
-                    isCollected = !item.isCollected,
-                    collectCount = if (item.isCollected) item.collectCount - 1 else item.collectCount + 1
-                )
-            } else item
+        viewModelScope.launch {
+            userRepository.toggleCollect(itemId).fold(
+                onSuccess = { interaction ->
+                    allItems = allItems.map { item ->
+                        if (item.id == itemId) {
+                            item.copy(
+                                isLiked = interaction.isLiked,
+                                likeCount = interaction.likeCount,
+                                isCollected = interaction.isCollected,
+                                collectCount = interaction.collectCount
+                            )
+                        } else item
+                    }
+                    updateFilteredItems()
+                },
+                onFailure = {
+                    allItems = allItems.map { item ->
+                        if (item.id == itemId) {
+                            item.copy(
+                                isCollected = !item.isCollected,
+                                collectCount = if (item.isCollected) item.collectCount - 1 else item.collectCount + 1
+                            )
+                        } else item
+                    }
+                    updateFilteredItems()
+                }
+            )
         }
-        updateFilteredItems()
     }
 
     fun toggleShare(itemId: String) {

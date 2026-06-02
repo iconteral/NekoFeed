@@ -66,3 +66,55 @@ class FeedResponse(BaseModel):
     limit: int
     offset: int
     total: int
+
+
+# --- User Schemas ---
+
+class UserCreate(BaseModel):
+    username: str
+    password: str
+
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+class UserResponse(BaseModel):
+    id: int
+    username: str
+    avatar: Optional[str] = None
+    bio: Optional[str] = None
+    level: str = "Normal"
+    is_active: bool = True
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class UserUpdate(BaseModel):
+    avatar: Optional[str] = None
+    bio: Optional[str] = None
+
+class ChangePassword(BaseModel):
+    old_password: str
+    new_password: str
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+class TokenData(BaseModel):
+    user_id: Optional[int] = None
+
+
+# --- User Interaction Schemas ---
+
+class UserStats(BaseModel):
+    likes_count: int = 0
+    collections_count: int = 0
+    history_count: int = 0
+
+class ItemInteraction(BaseModel):
+    is_liked: bool = False
+    is_collected: bool = False
+    like_count: int = 0
+    collect_count: int = 0

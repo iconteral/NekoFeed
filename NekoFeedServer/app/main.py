@@ -4,7 +4,7 @@ from fastapi.responses import RedirectResponse
 import os
 
 from app.database import engine, Base
-from app.routers import api, admin
+from app.routers import api, admin, user, user_interaction
 
 # Create tables
 Base.metadata.create_all(bind=engine)
@@ -22,6 +22,8 @@ app.mount("/media", StaticFiles(directory="data/media"), name="media")
 # Include routers
 app.include_router(api.router)
 app.include_router(admin.router)
+app.include_router(user.router)
+app.include_router(user_interaction.router)
 
 @app.get("/")
 def root():

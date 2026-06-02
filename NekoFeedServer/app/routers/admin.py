@@ -4,7 +4,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 from app.database import get_db
-from app.models import UpstreamFeed, FeedItem
+from app.models import UpstreamFeed, FeedItem, User, UserLike, UserCollect, UserHistory
 from app.schemas import UpstreamFeedCreate
 import hashlib
 import time
@@ -54,11 +54,13 @@ def admin_dashboard(request: Request, db: Session = Depends(get_db)):
     feed_count = db.query(UpstreamFeed).count()
     item_count = db.query(FeedItem).count()
     custom_item_count = db.query(FeedItem).filter(FeedItem.is_custom == True).count()
+    user_count = db.query(User).count()
     return templates.TemplateResponse(request=request, name="dashboard.html", context={
         "request": request,
         "feed_count": feed_count,
         "item_count": item_count,
-        "custom_item_count": custom_item_count
+        "custom_item_count": custom_item_count,
+        "user_count": user_count
     })
 
 @router.get("/feeds", response_class=HTMLResponse)
@@ -183,3 +185,29 @@ def delete_item(item_id: str, db: Session = Depends(get_db)):
         db.delete(item)
         db.commit()
     return RedirectResponse(url="/admin/items", status_code=303)
+
+
+# User management routes
+@router.get("/users", response_class=HTMLResponse)
+def admin_users(request: Request, db: Session = Depends(get_db)):
+    users = db.query(User).all()
+    user_data = []
+    for user in users:
+        likes_count = db.query(UserLike).filter(UserLike.user_id == user.id).count()
+        collects_count = db.query(UserCollect).filter(UserCollect.user_id == user.id).count()
+        history_count = db.query(UserHistory).filter(UserHistory.user_id == user.id).count()
+        user_data.append({
+            **{c.name: getattr(user, c.name) for c in user.__table__.columns},
+            "likes_count": likes_count,
+            "collects_count": collects_count,
+            "history_count": history_count
+        })
+    return templates.TemplateResponse(request=request, name="users.html", context={"request": request, "users": user_data})
+
+@router.post("/users/{user_id}/toggle")
+def toggle_user(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if user:
+        user.is_active = not user.is_active
+        db.commit()
+    return RedirectResponse(url="/admin/users", status_code=303)
