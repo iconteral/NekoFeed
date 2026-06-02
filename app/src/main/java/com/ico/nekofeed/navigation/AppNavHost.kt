@@ -60,7 +60,11 @@ fun AppNavHost(
         NavHost(
             navController = navController,
             startDestination = "feed",
-            modifier = Modifier.padding(paddingValues)
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(
+                    bottom = paddingValues.calculateBottomPadding()
+                )
         ) {
             // 首页
             composable("feed") {

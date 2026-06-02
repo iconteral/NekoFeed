@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Upstream Feeds</h1>
+
+<div class="card">
+    <h3>Add New Feed</h3>
+    <form action="/admin/feeds" method="post" style="flex-direction: row; align-items: center; max-width: 100%;">
+        <input type="text" name="name" placeholder="Feed Name (e.g. 36Kr)" required style="flex: 1;">
+        <input type="url" name="url" placeholder="RSS/Atom URL" required style="flex: 2;">
+        <select name="category">
+            <option value="tech">Tech</option>
+            <option value="ai">AI</option>
+            <option value="news">News</option>
+            <option value="featured">Featured</option>
+        </select>
+        <button type="submit" class="btn">Add Feed</button>
+    </form>
+</div>
+
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h3>Feed List</h3>
+        <form action="/api/refresh" method="post" style="margin: 0;">
+            <button type="submit" class="btn">Refresh All Now</button>
+        </form>
+    </div>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>URL</th>
+                <th>Category</th>
+                <th>Status</th>
+                <th>Last Fetch</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for feed in feeds %}
+            <tr>
+                <td>{{ feed.id }}</td>
+                <td>{{ feed.name }}</td>
+                <td><a href="{{ feed.url }}" target="_blank">Link</a></td>
+                <td>{{ feed.category }}</td>
+                <td>
+                    {% if feed.last_status == 'success' %}
+                        <span style="color: green;">Success</span>
+                    {% elif feed.last_status == 'error' %}
+                        <span style="color: red;" title="{{ feed.last_error }}">Error</span>
+                    {% else %}
+                        <span>Pending</span>
+                    {% endif %}
+                    <br>
+                    <small>{{ "Enabled" if feed.enabled else "Disabled" }}</small>
+                </td>
+                <td>{{ feed.last_fetch_at.strftime('%Y-%m-%d %H:%M') if feed.last_fetch_at else 'Never' }}</td>
+                <td style="display: flex; gap: 5px;">
+                    <form action="/api/feeds/{{ feed.id }}/refresh" method="post" style="margin: 0; display: inline-block;">
+                        <button type="submit" class="btn" style="background-color: #2ecc71; padding: 4px 8px;">Fetch</button>
+                    </form>
+                    <form action="/admin/feeds/{{ feed.id }}/toggle" method="post" style="margin: 0; display: inline-block;">
+                        <button type="submit" class="btn" style="background-color: #f39c12; padding: 4px 8px;">{{ "Disable" if feed.enabled else "Enable" }}</button>
+                    </form>
+                    <form action="/admin/feeds/{{ feed.id }}/delete" method="post" style="margin: 0; display: inline-block;" onsubmit="return confirm('Are you sure?');">
+                        <button type="submit" class="btn btn-danger" style="padding: 4px 8px;">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

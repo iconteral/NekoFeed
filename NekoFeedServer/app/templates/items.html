@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+    <h1>Feed Items</h1>
+    <div style="display: flex; gap: 10px;">
+        <a href="/admin/items/new" class="btn">Create Custom Item</a>
+        <form action="/admin/items/delete-no-media" method="post" style="margin: 0;">
+            <button type="submit" class="btn btn-danger" onclick="return confirm('Delete all items without any media?');">Delete No-Media Items</button>
+        </form>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: 2rem;">
+    <form action="/admin/items" method="get" style="flex-direction: row; align-items: center; max-width: 100%;">
+        <select name="category">
+            <option value="">All Categories</option>
+            <option value="tech" {% if category == 'tech' %}selected{% endif %}>Tech</option>
+            <option value="ai" {% if category == 'ai' %}selected{% endif %}>AI</option>
+            <option value="news" {% if category == 'news' %}selected{% endif %}>News</option>
+            <option value="featured" {% if category == 'featured' %}selected{% endif %}>Featured</option>
+            <option value="ad" {% if category == 'ad' %}selected{% endif %}>Ads</option>
+        </select>
+        <select name="item_type">
+            <option value="">All Types</option>
+            <option value="article" {% if item_type == 'article' %}selected{% endif %}>Article</option>
+            <option value="ad" {% if item_type == 'ad' %}selected{% endif %}>Ad</option>
+            <option value="video" {% if item_type == 'video' %}selected{% endif %}>Video</option>
+            <option value="product" {% if item_type == 'product' %}selected{% endif %}>Product</option>
+        </select>
+        <button type="submit" class="btn">Filter</button>
+        <a href="/admin/items" class="btn" style="background-color: #95a5a6;">Clear</a>
+    </form>
+</div>
+
+<div class="feed-items-grid">
+    {% for item in items %}
+    <div class="feed-item-card">
+        {% if item.local_image_path %}
+            <img src="{{ item.local_image_path }}" alt="Image">
+        {% elif item.image_url %}
+            <img src="{{ item.image_url }}" alt="Image" onerror="this.style.display='none'">
+        {% else %}
+            <div style="height: 180px; background: #eee; display: flex; align-items: center; justify-content: center; color: #aaa;">No Image</div>
+        {% endif %}
+        <div class="feed-item-card-content">
+            <div class="badges">
+                <span class="badge">{{ item.category }}</span>
+                <span class="badge">{{ item.item_type }}</span>
+                {% if item.is_custom %}
+                <span class="badge" style="background-color: #f1c40f;">Custom</span>
+                {% endif %}
+            </div>
+            <h4>{{ item.title }}</h4>
+            <p>{{ item.summary[:100] }}...</p>
+            <div style="font-size: 0.8rem; color: #999; margin-top: 10px;">
+                {{ item.source_name }} &bull; {{ item.published_at.strftime('%Y-%m-%d %H:%M') if item.published_at else '' }}
+            </div>
+            <div style="margin-top: 10px; display: flex; gap: 10px;">
+                <a href="/admin/items/{{ item.id }}" class="btn" style="flex: 1; text-align: center;">View</a>
+                <form action="/admin/items/{{ item.id }}/delete" method="post" style="margin: 0; flex: 1;">
+                    <button type="submit" class="btn btn-danger" style="width: 100%;" onsubmit="return confirm('Delete this item?');">Delete</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

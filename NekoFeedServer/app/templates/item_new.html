@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="margin-bottom: 1rem;">
+    <a href="/admin/items" style="color: #3498db; text-decoration: none;">&larr; Back to Items</a>
+</div>
+
+<div class="card" style="max-width: 600px; margin: auto;">
+    <h2>Add Custom Item (Ad/Announcement)</h2>
+    <form action="/admin/items/new" method="post" enctype="multipart/form-data" style="max-width: 100%;">
+        <div style="display: flex; flex-direction: column; gap: 5px;">
+            <label>Title *</label>
+            <input type="text" name="title" required>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 5px;">
+            <label>Summary</label>
+            <textarea name="summary"></textarea>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 5px;">
+            <label>Category</label>
+            <select name="category">
+                <option value="ad">Ad</option>
+                <option value="featured">Featured</option>
+                <option value="local">Local</option>
+            </select>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 5px;">
+            <label>Item Type</label>
+            <select name="item_type">
+                <option value="ad">Ad</option>
+                <option value="article">Article</option>
+                <option value="video">Video</option>
+                <option value="product">Product</option>
+            </select>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 5px;">
+            <label>Card Type</label>
+            <select name="card_type">
+                <option value="large_image">Large Image</option>
+                <option value="small_image">Small Image</option>
+                <option value="video">Video</option>
+            </select>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 5px;">
+            <label>Image URL (Optional)</label>
+            <input type="url" name="image_url" placeholder="http://example.com/image.jpg">
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 5px;">
+            <label>Image Upload (Optional)</label>
+            <input type="file" name="image_file" accept="image/*">
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 5px;">
+            <label>Media URL (Optional, for videos)</label>
+            <input type="url" name="media_url" placeholder="http://example.com/video.mp4">
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 5px;">
+            <label>Media Upload (Optional, for videos)</label>
+            <input type="file" name="media_file" accept="video/*">
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 5px;">
+            <label>Tags (Comma separated)</label>
+            <input type="text" name="tags" placeholder="tag1, tag2">
+        </div>
+
+        <button type="submit" class="btn" style="margin-top: 1rem;">Create Item</button>
+    </form>
+</div>
+{% endblock %}

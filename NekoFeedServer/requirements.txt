@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+sqlalchemy
+feedparser
+httpx
+jinja2
+python-multipart
+python-dateutil
+beautifulsoup4

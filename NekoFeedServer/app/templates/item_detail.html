@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="margin-bottom: 1rem;">
+    <a href="/admin/items" style="color: #3498db; text-decoration: none;">&larr; Back to Items</a>
+</div>
+
+<div class="card" style="max-width: 800px; margin: auto;">
+    <div class="badges">
+        <span class="badge">{{ item.category }}</span>
+        <span class="badge">{{ item.item_type }}</span>
+        <span class="badge">{{ item.card_type }}</span>
+        {% if item.is_custom %}
+        <span class="badge" style="background-color: #f1c40f;">Custom</span>
+        {% endif %}
+    </div>
+
+    <h1 style="margin-top: 10px;">{{ item.title }}</h1>
+    
+    <div style="color: #666; margin-bottom: 20px;">
+        <strong>Source:</strong> {{ item.source_name or 'N/A' }} <br>
+        <strong>Published:</strong> {{ item.published_at.strftime('%Y-%m-%d %H:%M:%S') if item.published_at else 'N/A' }} <br>
+        <strong>Link:</strong> {% if item.source_url %}<a href="{{ item.source_url }}" target="_blank">{{ item.source_url }}</a>{% else %}N/A{% endif %}
+    </div>
+
+    {% if item.local_image_path or item.image_url %}
+    <div style="margin-bottom: 20px;">
+        <img src="{{ item.local_image_path or item.image_url }}" style="max-width: 100%; border-radius: 8px;">
+        <br>
+        <small style="color: #999;">Image Path: {{ item.local_image_path or item.image_url }}</small>
+    </div>
+    {% endif %}
+
+    {% if item.local_media_path or item.media_url %}
+    <div style="margin-bottom: 20px; background: #eee; padding: 10px; border-radius: 8px;">
+        <strong>Media URL attached:</strong> {{ item.local_media_path or item.media_url }}
+    </div>
+    {% endif %}
+
+    <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+        <h3>Summary</h3>
+        <p style="white-space: pre-wrap;">{{ item.summary }}</p>
+    </div>
+
+    {% if item.content %}
+    <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+        <h3>Content</h3>
+        <div style="overflow-x: auto;">
+            {{ item.content | safe }}
+        </div>
+    </div>
+    {% endif %}
+    
+    <form action="/admin/items/{{ item.id }}/delete" method="post" style="margin-top: 20px;" onsubmit="return confirm('Delete this item?');">
+        <button type="submit" class="btn btn-danger">Delete Item</button>
+    </form>
+</div>
+{% endblock %}

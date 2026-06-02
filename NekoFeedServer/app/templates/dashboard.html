@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Dashboard</h1>
+
+<div class="dashboard-stats">
+    <div class="stat-box">
+        <h3>Upstream Feeds</h3>
+        <div class="number">{{ feed_count }}</div>
+    </div>
+    <div class="stat-box">
+        <h3>Total Items</h3>
+        <div class="number">{{ item_count }}</div>
+    </div>
+    <div class="stat-box">
+        <h3>Custom Items</h3>
+        <div class="number">{{ custom_item_count }}</div>
+    </div>
+</div>
+
+<div class="card" style="margin-top: 2rem;">
+    <h3>Quick Actions</h3>
+    <div style="display: flex; gap: 1rem;">
+        <form action="/api/refresh" method="post" style="margin: 0; display: inline-block;">
+            <button type="submit" class="btn">Refresh All Feeds</button>
+        </form>
+        <a href="/admin/feeds" class="btn">Manage Feeds</a>
+        <a href="/admin/items/new" class="btn">Add Custom Ad/Item</a>
+    </div>
+</div>
+{% endblock %}
