@@ -19,6 +19,10 @@ object RetrofitClient {
         tokenProvider = provider
     }
 
+    fun hasToken(): Boolean {
+        return tokenProvider?.invoke() != null
+    }
+
     private val okHttpClient by lazy {
         OkHttpClient.Builder()
             .addInterceptor(loggingInterceptor)

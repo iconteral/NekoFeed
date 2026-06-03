@@ -23,6 +23,11 @@ class FeedViewModel : ViewModel() {
 
     private var allItems: List<FeedItem> = emptyList()
 
+    // 检查是否已登录（有 token）
+    private fun isLoggedIn(): Boolean {
+        return RetrofitClient.hasToken()
+    }
+
     init {
         loadFeed()
     }
@@ -106,6 +111,21 @@ class FeedViewModel : ViewModel() {
     }
 
     fun toggleLike(itemId: String) {
+        if (!isLoggedIn()) {
+            // 未登录时只做本地更新
+            allItems = allItems.map { item ->
+                if (item.id == itemId) {
+                    item.copy(
+                        isLiked = !item.isLiked,
+                        likeCount = if (item.isLiked) item.likeCount - 1 else item.likeCount + 1,
+                        aiTags = item.aiTags ?: emptyList()
+                    )
+                } else item
+            }
+            updateFilteredItems()
+            return
+        }
+
         viewModelScope.launch {
             userRepository.toggleLike(itemId).fold(
                 onSuccess = { interaction ->
@@ -115,7 +135,8 @@ class FeedViewModel : ViewModel() {
                                 isLiked = interaction.isLiked,
                                 likeCount = interaction.likeCount,
                                 isCollected = interaction.isCollected,
-                                collectCount = interaction.collectCount
+                                collectCount = interaction.collectCount,
+                                aiTags = item.aiTags ?: emptyList()
                             )
                         } else item
                     }
@@ -126,7 +147,8 @@ class FeedViewModel : ViewModel() {
                         if (item.id == itemId) {
                             item.copy(
                                 isLiked = !item.isLiked,
-                                likeCount = if (item.isLiked) item.likeCount - 1 else item.likeCount + 1
+                                likeCount = if (item.isLiked) item.likeCount - 1 else item.likeCount + 1,
+                                aiTags = item.aiTags ?: emptyList()
                             )
                         } else item
                     }
@@ -137,6 +159,21 @@ class FeedViewModel : ViewModel() {
     }
 
     fun toggleCollect(itemId: String) {
+        if (!isLoggedIn()) {
+            // 未登录时只做本地更新
+            allItems = allItems.map { item ->
+                if (item.id == itemId) {
+                    item.copy(
+                        isCollected = !item.isCollected,
+                        collectCount = if (item.isCollected) item.collectCount - 1 else item.collectCount + 1,
+                        aiTags = item.aiTags ?: emptyList()
+                    )
+                } else item
+            }
+            updateFilteredItems()
+            return
+        }
+
         viewModelScope.launch {
             userRepository.toggleCollect(itemId).fold(
                 onSuccess = { interaction ->
@@ -146,7 +183,8 @@ class FeedViewModel : ViewModel() {
                                 isLiked = interaction.isLiked,
                                 likeCount = interaction.likeCount,
                                 isCollected = interaction.isCollected,
-                                collectCount = interaction.collectCount
+                                collectCount = interaction.collectCount,
+                                aiTags = item.aiTags ?: emptyList()
                             )
                         } else item
                     }
@@ -157,7 +195,8 @@ class FeedViewModel : ViewModel() {
                         if (item.id == itemId) {
                             item.copy(
                                 isCollected = !item.isCollected,
-                                collectCount = if (item.isCollected) item.collectCount - 1 else item.collectCount + 1
+                                collectCount = if (item.isCollected) item.collectCount - 1 else item.collectCount + 1,
+                                aiTags = item.aiTags ?: emptyList()
                             )
                         } else item
                     }
@@ -170,7 +209,7 @@ class FeedViewModel : ViewModel() {
     fun toggleShare(itemId: String) {
         allItems = allItems.map { item ->
             if (item.id == itemId) {
-                item.copy(shareCount = item.shareCount + 1)
+                item.copy(shareCount = item.shareCount + 1, aiTags = item.aiTags ?: emptyList())
             } else item
         }
         updateFilteredItems()
