@@ -102,97 +102,93 @@ fun FeedScreenContent(
 ) {
     val listState = rememberLazyListState()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(
-                                    Brush.linearGradient(
-                                        colors = listOf(
-                                            MaterialTheme.colorScheme.primary,
-                                            MaterialTheme.colorScheme.secondary
-                                        )
+    Column(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        // 1. 顶部标题栏直接放在 Column 顶部
+        TopAppBar(
+            title = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                Brush.linearGradient(
+                                    colors = listOf(
+                                        MaterialTheme.colorScheme.primary,
+                                        MaterialTheme.colorScheme.secondary
                                     )
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Star,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(14.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "NekoFeed AI",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(onClick = onSearchClick) {
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
                         Icon(
-                            imageVector = Icons.Filled.Search,
-                            contentDescription = "搜索"
+                            imageVector = Icons.Filled.Star,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(14.dp)
                         )
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "NekoFeed AI",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                }
+            },
+            actions = {
+                IconButton(onClick = onSearchClick) {
+                    Icon(
+                        imageVector = Icons.Filled.Search,
+                        contentDescription = "搜索"
+                    )
+                }
+            },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.surface
             )
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
+        )
+
+        // 2. Tab 频道栏
+        FeedTabRow(
+            selectedCategory = uiState.selectedCategory,
+            onCategorySelected = onCategorySelected
+        )
+
+        // 3. AI 搜索提示条
+        AISearchBar(onClick = onSearchClick)
+
+        // 4. 信息流列表
+        PullToRefreshBox(
+            isRefreshing = uiState.isRefreshing,
+            onRefresh = onRefresh,
+            modifier = Modifier.weight(1f).fillMaxWidth()
         ) {
-            // Tab 频道栏
-            FeedTabRow(
-                selectedCategory = uiState.selectedCategory,
-                onCategorySelected = onCategorySelected
-            )
-
-            // AI 搜索提示条
-            AISearchBar(onClick = onSearchClick)
-
-            // 信息流列表
-            PullToRefreshBox(
-                isRefreshing = uiState.isRefreshing,
-                onRefresh = onRefresh
-            ) {
-                when {
-                    uiState.isLoading -> {
-                        FeedLoadingContent()
-                    }
-                    uiState.errorMessage != null && uiState.items.isEmpty() -> {
-                        ErrorContent(
-                            message = uiState.errorMessage,
-                            onRetry = onRetry
-                        )
-                    }
-                    else -> {
-                        FeedContent(
-                            items = uiState.items,
-                            usingFallback = uiState.usingFallback,
-                            listState = listState,
-                            onItemClick = onItemClick,
-                            onLikeClick = onLikeClick,
-                            onCollectClick = onCollectClick,
-                            onShareClick = onShareClick,
-                            onTagClick = onTagClick
-                        )
-                    }
+            when {
+                uiState.isLoading -> {
+                    FeedLoadingContent()
+                }
+                uiState.errorMessage != null && uiState.items.isEmpty() -> {
+                    ErrorContent(
+                        message = uiState.errorMessage,
+                        onRetry = onRetry
+                    )
+                }
+                else -> {
+                    FeedContent(
+                        items = uiState.items,
+                        usingFallback = uiState.usingFallback,
+                        listState = listState,
+                        onItemClick = onItemClick,
+                        onLikeClick = onLikeClick,
+                        onCollectClick = onCollectClick,
+                        onShareClick = onShareClick,
+                        onTagClick = onTagClick
+                    )
                 }
             }
         }
@@ -326,10 +322,7 @@ private fun FeedContent(
             )
         }
 
-        // 底部间距
-        item {
-            Spacer(modifier = Modifier.height(80.dp))
-        }
+        // 删掉了多余的 80dp Spacer
     }
 }
 

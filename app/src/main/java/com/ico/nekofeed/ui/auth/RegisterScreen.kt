@@ -39,6 +39,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.tooling.preview.Preview
 
 @Composable
 fun RegisterScreen(
@@ -60,6 +61,45 @@ fun RegisterScreen(
         }
     }
 
+    RegisterScreenContent(
+        uiState = uiState,
+        username = username,
+        password = password,
+        confirmPassword = confirmPassword,
+        passwordVisible = passwordVisible,
+        confirmPasswordVisible = confirmPasswordVisible,
+        onUsernameChange = { username = it; viewModel.clearError() },
+        onPasswordChange = { password = it; viewModel.clearError() },
+        onConfirmPasswordChange = { confirmPassword = it; viewModel.clearError() },
+        onPasswordVisibilityToggle = { passwordVisible = !passwordVisible },
+        onConfirmPasswordVisibilityToggle = { confirmPasswordVisible = !confirmPasswordVisible },
+        onRegister = {
+            if (password == confirmPassword) {
+                viewModel.register(username, password)
+            }
+        },
+        onNavigateToLogin = onNavigateToLogin,
+        focusManager = focusManager
+    )
+}
+
+@Composable
+fun RegisterScreenContent(
+    uiState: AuthUiState,
+    username: String,
+    password: String,
+    confirmPassword: String,
+    passwordVisible: Boolean,
+    confirmPasswordVisible: Boolean,
+    onUsernameChange: (String) -> Unit,
+    onPasswordChange: (String) -> Unit,
+    onConfirmPasswordChange: (String) -> Unit,
+    onPasswordVisibilityToggle: () -> Unit,
+    onConfirmPasswordVisibilityToggle: () -> Unit,
+    onRegister: () -> Unit,
+    onNavigateToLogin: () -> Unit,
+    focusManager: androidx.compose.ui.focus.FocusManager = LocalFocusManager.current
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -85,7 +125,7 @@ fun RegisterScreen(
 
         OutlinedTextField(
             value = username,
-            onValueChange = { username = it; viewModel.clearError() },
+            onValueChange = onUsernameChange,
             label = { Text("Username") },
             leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
             singleLine = true,
@@ -98,11 +138,11 @@ fun RegisterScreen(
 
         OutlinedTextField(
             value = password,
-            onValueChange = { password = it; viewModel.clearError() },
+            onValueChange = onPasswordChange,
             label = { Text("Password") },
             leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
             trailingIcon = {
-                IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                IconButton(onClick = onPasswordVisibilityToggle) {
                     Icon(
                         if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                         contentDescription = if (passwordVisible) "Hide password" else "Show password"
@@ -123,11 +163,11 @@ fun RegisterScreen(
 
         OutlinedTextField(
             value = confirmPassword,
-            onValueChange = { confirmPassword = it; viewModel.clearError() },
+            onValueChange = onConfirmPasswordChange,
             label = { Text("Confirm Password") },
             leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
             trailingIcon = {
-                IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
+                IconButton(onClick = onConfirmPasswordVisibilityToggle) {
                     Icon(
                         if (confirmPasswordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                         contentDescription = if (confirmPasswordVisible) "Hide password" else "Show password"
@@ -142,9 +182,7 @@ fun RegisterScreen(
             ),
             keyboardActions = KeyboardActions(onDone = {
                 focusManager.clearFocus()
-                if (password == confirmPassword) {
-                    viewModel.register(username, password)
-                }
+                onRegister()
             }),
             modifier = Modifier.fillMaxWidth()
         )
@@ -170,11 +208,7 @@ fun RegisterScreen(
         Spacer(modifier = Modifier.height(32.dp))
 
         Button(
-            onClick = {
-                if (password == confirmPassword) {
-                    viewModel.register(username, password)
-                }
-            },
+            onClick = onRegister,
             enabled = !uiState.isLoading && password == confirmPassword,
             modifier = Modifier
                 .fillMaxWidth()
@@ -195,5 +229,27 @@ fun RegisterScreen(
         TextButton(onClick = onNavigateToLogin) {
             Text("Already have an account? Login")
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun RegisterScreenPreview() {
+    MaterialTheme {
+        RegisterScreenContent(
+            uiState = AuthUiState(),
+            username = "",
+            password = "",
+            confirmPassword = "",
+            passwordVisible = false,
+            confirmPasswordVisible = false,
+            onUsernameChange = {},
+            onPasswordChange = {},
+            onConfirmPasswordChange = {},
+            onPasswordVisibilityToggle = {},
+            onConfirmPasswordVisibilityToggle = {},
+            onRegister = {},
+            onNavigateToLogin = {}
+        )
     }
 }

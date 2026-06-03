@@ -57,6 +57,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.tooling.preview.Preview
 import com.ico.nekofeed.data.model.FeedItem
 import com.ico.nekofeed.ui.feed.components.FeedItemCard
 import com.ico.nekofeed.ui.feed.components.FeedTagChip
@@ -547,6 +548,18 @@ private fun EmptySearchResult() {
             text = "换个关键词试试吧",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun SearchScreenPreview() {
+    MaterialTheme {
+        SearchScreen(
+            onBack = {},
+            onItemClick = {},
+            searchAds = { emptyList() }
         )
     }
 }

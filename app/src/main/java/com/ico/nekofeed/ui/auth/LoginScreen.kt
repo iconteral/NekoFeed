@@ -39,6 +39,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.tooling.preview.Preview
 
 @Composable
 fun LoginScreen(
@@ -58,6 +59,33 @@ fun LoginScreen(
         }
     }
 
+    LoginScreenContent(
+        uiState = uiState,
+        username = username,
+        password = password,
+        passwordVisible = passwordVisible,
+        onUsernameChange = { username = it; viewModel.clearError() },
+        onPasswordChange = { password = it; viewModel.clearError() },
+        onPasswordVisibilityToggle = { passwordVisible = !passwordVisible },
+        onLogin = { viewModel.login(username, password) },
+        onNavigateToRegister = onNavigateToRegister,
+        focusManager = focusManager
+    )
+}
+
+@Composable
+fun LoginScreenContent(
+    uiState: AuthUiState,
+    username: String,
+    password: String,
+    passwordVisible: Boolean,
+    onUsernameChange: (String) -> Unit,
+    onPasswordChange: (String) -> Unit,
+    onPasswordVisibilityToggle: () -> Unit,
+    onLogin: () -> Unit,
+    onNavigateToRegister: () -> Unit,
+    focusManager: androidx.compose.ui.focus.FocusManager = LocalFocusManager.current
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -83,7 +111,7 @@ fun LoginScreen(
 
         OutlinedTextField(
             value = username,
-            onValueChange = { username = it; viewModel.clearError() },
+            onValueChange = onUsernameChange,
             label = { Text("Username") },
             leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
             singleLine = true,
@@ -96,11 +124,11 @@ fun LoginScreen(
 
         OutlinedTextField(
             value = password,
-            onValueChange = { password = it; viewModel.clearError() },
+            onValueChange = onPasswordChange,
             label = { Text("Password") },
             leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
             trailingIcon = {
-                IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                IconButton(onClick = onPasswordVisibilityToggle) {
                     Icon(
                         if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                         contentDescription = if (passwordVisible) "Hide password" else "Show password"
@@ -115,7 +143,7 @@ fun LoginScreen(
             ),
             keyboardActions = KeyboardActions(onDone = {
                 focusManager.clearFocus()
-                viewModel.login(username, password)
+                onLogin()
             }),
             modifier = Modifier.fillMaxWidth()
         )
@@ -132,7 +160,7 @@ fun LoginScreen(
         Spacer(modifier = Modifier.height(32.dp))
 
         Button(
-            onClick = { viewModel.login(username, password) },
+            onClick = onLogin,
             enabled = !uiState.isLoading,
             modifier = Modifier
                 .fillMaxWidth()
@@ -153,5 +181,23 @@ fun LoginScreen(
         TextButton(onClick = onNavigateToRegister) {
             Text("Don't have an account? Register")
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun LoginScreenPreview() {
+    MaterialTheme {
+        LoginScreenContent(
+            uiState = AuthUiState(),
+            username = "",
+            password = "",
+            passwordVisible = false,
+            onUsernameChange = {},
+            onPasswordChange = {},
+            onPasswordVisibilityToggle = {},
+            onLogin = {},
+            onNavigateToRegister = {}
+        )
     }
 }

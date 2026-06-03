@@ -1,6 +1,8 @@
 package com.ico.nekofeed.ui.profile
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,6 +16,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.Edit
@@ -25,7 +28,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -46,10 +48,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
+import androidx.compose.ui.tooling.preview.Preview
 import com.ico.nekofeed.data.model.UserStats
+import com.ico.nekofeed.ui.auth.AuthUiState
 import com.ico.nekofeed.ui.auth.AuthViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -72,18 +74,42 @@ fun ProfileScreen(
         }
     }
 
+    ProfileScreenContent(
+        authState = authState,
+        userStats = userStats,
+        isLoadingStats = isLoadingStats,
+        onLogout = { authViewModel.logout() },
+        onNavigateToLikes = onNavigateToLikes,
+        onNavigateToCollections = onNavigateToCollections,
+        onNavigateToHistory = onNavigateToHistory,
+        onBack = onBack
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ProfileScreenContent(
+    authState: AuthUiState,
+    userStats: UserStats?,
+    isLoadingStats: Boolean,
+    onLogout: () -> Unit,
+    onNavigateToLikes: () -> Unit,
+    onNavigateToCollections: () -> Unit,
+    onNavigateToHistory: () -> Unit,
+    onBack: () -> Unit
+) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Profile") },
+                title = { Text("个人中心") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
                     }
                 },
                 actions = {
-                    IconButton(onClick = { authViewModel.logout() }) {
-                        Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Logout")
+                    IconButton(onClick = onLogout) {
+                        Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "退出登录")
                     }
                 }
             )
@@ -97,25 +123,31 @@ fun ProfileScreen(
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // User Avatar
-            AsyncImage(
-                model = authState.user?.avatar ?: "https://via.placeholder.com/150",
-                contentDescription = "Avatar",
+            // 头像
+            Box(
                 modifier = Modifier
                     .size(100.dp)
-                    .clip(CircleShape),
-                contentScale = ContentScale.Crop
-            )
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Person,
+                    contentDescription = "头像",
+                    modifier = Modifier.size(56.dp),
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Username
+            // 用户名
             Text(
-                text = authState.user?.username ?: "User",
+                text = authState.user?.username ?: "用户",
                 style = MaterialTheme.typography.headlineMedium
             )
 
-            // Bio
+            // 简介
             if (!authState.user?.bio.isNullOrEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
@@ -125,17 +157,17 @@ fun ProfileScreen(
                 )
             }
 
-            // Level
+            // 等级
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Level: ${authState.user?.level ?: "Normal"}",
+                text = "等级: ${authState.user?.level ?: "普通"}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.primary
             )
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Stats Card
+            // 统计卡片
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
@@ -146,7 +178,7 @@ fun ProfileScreen(
                     modifier = Modifier.padding(16.dp)
                 ) {
                     Text(
-                        text = "Statistics",
+                        text = "数据统计",
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.padding(bottom = 16.dp)
                     )
@@ -157,17 +189,17 @@ fun ProfileScreen(
                     ) {
                         StatItem(
                             icon = Icons.Default.Favorite,
-                            label = "Likes",
+                            label = "点赞",
                             count = userStats?.likesCount ?: 0
                         )
                         StatItem(
                             icon = Icons.Default.Collections,
-                            label = "Collections",
+                            label = "收藏",
                             count = userStats?.collectionsCount ?: 0
                         )
                         StatItem(
                             icon = Icons.Default.History,
-                            label = "History",
+                            label = "历史",
                             count = userStats?.historyCount ?: 0
                         )
                     }
@@ -176,38 +208,38 @@ fun ProfileScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Menu Items
+            // 菜单项
             Card(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column {
                     MenuItem(
                         icon = Icons.Default.Favorite,
-                        title = "My Likes",
+                        title = "我的点赞",
                         onClick = onNavigateToLikes
                     )
                     Divider(modifier = Modifier.padding(horizontal = 16.dp))
                     MenuItem(
                         icon = Icons.Default.Collections,
-                        title = "My Collections",
+                        title = "我的收藏",
                         onClick = onNavigateToCollections
                     )
                     Divider(modifier = Modifier.padding(horizontal = 16.dp))
                     MenuItem(
                         icon = Icons.Default.History,
-                        title = "Browsing History",
+                        title = "浏览历史",
                         onClick = onNavigateToHistory
                     )
                     Divider(modifier = Modifier.padding(horizontal = 16.dp))
                     MenuItem(
                         icon = Icons.Default.Edit,
-                        title = "Edit Profile",
+                        title = "编辑资料",
                         onClick = { }
                     )
                     Divider(modifier = Modifier.padding(horizontal = 16.dp))
                     MenuItem(
                         icon = Icons.Default.Lock,
-                        title = "Change Password",
+                        title = "修改密码",
                         onClick = { }
                     )
                 }
@@ -215,9 +247,9 @@ fun ProfileScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Logout Button
+            // 退出登录按钮
             OutlinedButton(
-                onClick = { authViewModel.logout() },
+                onClick = onLogout,
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.outlinedButtonColors(
                     contentColor = MaterialTheme.colorScheme.error
@@ -229,7 +261,7 @@ fun ProfileScreen(
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Logout")
+                Text("退出登录")
             }
         }
     }
@@ -292,5 +324,35 @@ private fun MenuItem(
                 color = MaterialTheme.colorScheme.onSurface
             )
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun ProfileScreenPreview() {
+    MaterialTheme {
+        ProfileScreenContent(
+            authState = AuthUiState(
+                isLoggedIn = true,
+                user = com.ico.nekofeed.data.model.User(
+                    id = 1,
+                    username = "NekoUser",
+                    avatar = null,
+                    bio = "AI 与猫咪爱好者",
+                    level = "Premium"
+                )
+            ),
+            userStats = UserStats(
+                likesCount = 128,
+                collectionsCount = 45,
+                historyCount = 320
+            ),
+            isLoadingStats = false,
+            onLogout = {},
+            onNavigateToLikes = {},
+            onNavigateToCollections = {},
+            onNavigateToHistory = {},
+            onBack = {}
+        )
     }
 }

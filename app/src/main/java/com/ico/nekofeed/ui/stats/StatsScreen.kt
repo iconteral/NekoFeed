@@ -69,6 +69,7 @@ import com.ico.nekofeed.ui.theme.StatPinkEnd
 import com.ico.nekofeed.ui.theme.StatPinkStart
 import com.ico.nekofeed.ui.theme.StatPurpleEnd
 import com.ico.nekofeed.ui.theme.StatPurpleStart
+import androidx.compose.ui.tooling.preview.Preview
 import com.ico.nekofeed.ui.theme.StatRedEnd
 import com.ico.nekofeed.ui.theme.StatRedStart
 
@@ -471,3 +472,26 @@ data class StatsData(
     val ctr: Float,
     val topItems: List<FeedItem>
 )
+
+@Preview(showBackground = true)
+@Composable
+fun StatsScreenPreview() {
+    MaterialTheme {
+        StatsScreen(
+            onBack = {},
+            getStats = {
+                StatsData(
+                    totalExposure = 25600,
+                    totalClick = 3890,
+                    totalLike = 4520,
+                    totalCollect = 1870,
+                    totalShare = 780,
+                    totalPlay = 8200,
+                    ctr = 0.152f,
+                    topItems = com.ico.nekofeed.data.local.FallbackFeedData.items.take(5)
+                )
+            },
+            onItemClick = {}
+        )
+    }
+}
