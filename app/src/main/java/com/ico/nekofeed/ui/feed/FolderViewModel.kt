@@ -1,11 +1,17 @@
 package com.ico.nekofeed.ui.feed
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.ico.nekofeed.data.local.TokenManager
+import com.ico.nekofeed.data.local.db.NekoFeedDatabase
 import com.ico.nekofeed.data.model.FeedCategory
 import com.ico.nekofeed.data.model.FeedItem
 import com.ico.nekofeed.data.remote.RetrofitClient
+import com.ico.nekofeed.data.repository.AiRepository
 import com.ico.nekofeed.data.repository.FeedRepository
+import com.ico.nekofeed.data.repository.InteractionType
+import com.ico.nekofeed.data.repository.UserProfileRepository
 import com.ico.nekofeed.data.repository.UserRepository
 import com.ico.nekofeed.util.FeedUiState
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,16 +20,21 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class FeedViewModel : ViewModel() {
+class FeedViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = FeedRepository(RetrofitClient.feedApi)
     private val userRepository = UserRepository(RetrofitClient.feedApi)
+    private val tokenManager = TokenManager(application)
+    private val database = NekoFeedDatabase.getInstance(application)
+    val aiRepository = AiRepository(tokenManager, database.aiCacheDao())
+    private val userProfileRepository = UserProfileRepository(database.userProfileDao())
 
     private val _uiState = MutableStateFlow(FeedUiState())
     val uiState: StateFlow<FeedUiState> = _uiState.asStateFlow()
 
     private var allItems: List<FeedItem> = emptyList()
 
-    // 检查是否已登录（有 token）
+    fun getAllItems(): List<FeedItem> = allItems
+
     private fun isLoggedIn(): Boolean {
         return RetrofitClient.hasToken()
     }
@@ -48,6 +59,7 @@ class FeedViewModel : ViewModel() {
                             usingFallback = false
                         )
                     }
+                    batchGenerateAi(items)
                 },
                 onFailure = { error ->
                     val fallbackItems = repository.getFallbackData()
@@ -61,6 +73,7 @@ class FeedViewModel : ViewModel() {
                             usingFallback = true
                         )
                     }
+                    batchGenerateAi(fallbackItems)
                 }
             )
         }
@@ -82,6 +95,7 @@ class FeedViewModel : ViewModel() {
                             usingFallback = false
                         )
                     }
+                    batchGenerateAi(items)
                 },
                 onFailure = { error ->
                     val fallbackItems = repository.getFallbackData()
@@ -100,6 +114,41 @@ class FeedViewModel : ViewModel() {
         }
     }
 
+    private fun batchGenerateAi(items: List<FeedItem>) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isAiLoading = true) }
+            try {
+                aiRepository.batchGenerateAi(items)
+                val updatedItems = allItems.map { item ->
+                    val cached = aiRepository.aiCacheDao().getCache(item.id)
+                    if (cached != null) {
+                        item.copy(
+                            aiSummary = cached.aiSummary ?: item.aiSummary,
+                            aiTags = parseTagsFromCache(cached.aiTags),
+                            aiReason = cached.aiReason ?: item.aiReason
+                        )
+                    } else item
+                }
+                allItems = updatedItems
+                updateFilteredItems()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                _uiState.update { it.copy(isAiLoading = false) }
+            }
+        }
+    }
+
+    private fun parseTagsFromCache(json: String): List<String> {
+        return try {
+            val gson = com.google.gson.Gson()
+            val listType = object : com.google.gson.reflect.TypeToken<List<String>>() {}.type
+            gson.fromJson(json, listType) ?: emptyList()
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
     fun retry() {
         loadFeed()
     }
@@ -111,8 +160,14 @@ class FeedViewModel : ViewModel() {
     }
 
     fun toggleLike(itemId: String) {
+        val item = allItems.find { it.id == itemId }
+        if (item != null) {
+            viewModelScope.launch {
+                userProfileRepository.recordInteraction(item, InteractionType.LIKE)
+            }
+        }
+
         if (!isLoggedIn()) {
-            // 未登录时只做本地更新
             allItems = allItems.map { item ->
                 if (item.id == itemId) {
                     item.copy(
@@ -159,8 +214,14 @@ class FeedViewModel : ViewModel() {
     }
 
     fun toggleCollect(itemId: String) {
+        val item = allItems.find { it.id == itemId }
+        if (item != null) {
+            viewModelScope.launch {
+                userProfileRepository.recordInteraction(item, InteractionType.COLLECT)
+            }
+        }
+
         if (!isLoggedIn()) {
-            // 未登录时只做本地更新
             allItems = allItems.map { item ->
                 if (item.id == itemId) {
                     item.copy(
@@ -207,6 +268,13 @@ class FeedViewModel : ViewModel() {
     }
 
     fun toggleShare(itemId: String) {
+        val item = allItems.find { it.id == itemId }
+        if (item != null) {
+            viewModelScope.launch {
+                userProfileRepository.recordInteraction(item, InteractionType.SHARE)
+            }
+        }
+
         allItems = allItems.map { item ->
             if (item.id == itemId) {
                 item.copy(shareCount = item.shareCount + 1, aiTags = item.aiTags ?: emptyList())

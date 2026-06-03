@@ -116,7 +116,7 @@ fun RegisterScreenContent(
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = "Create a new account",
+            text = "创建新账户",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -126,7 +126,7 @@ fun RegisterScreenContent(
         OutlinedTextField(
             value = username,
             onValueChange = onUsernameChange,
-            label = { Text("Username") },
+            label = { Text("用户名") },
             leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
@@ -139,13 +139,13 @@ fun RegisterScreenContent(
         OutlinedTextField(
             value = password,
             onValueChange = onPasswordChange,
-            label = { Text("Password") },
+            label = { Text("密码") },
             leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
             trailingIcon = {
                 IconButton(onClick = onPasswordVisibilityToggle) {
                     Icon(
                         if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                        contentDescription = if (passwordVisible) "Hide password" else "Show password"
+                        contentDescription = if (passwordVisible) "隐藏密码" else "显示密码"
                     )
                 }
             },
@@ -164,13 +164,13 @@ fun RegisterScreenContent(
         OutlinedTextField(
             value = confirmPassword,
             onValueChange = onConfirmPasswordChange,
-            label = { Text("Confirm Password") },
+            label = { Text("确认密码") },
             leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
             trailingIcon = {
                 IconButton(onClick = onConfirmPasswordVisibilityToggle) {
                     Icon(
                         if (confirmPasswordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                        contentDescription = if (confirmPasswordVisible) "Hide password" else "Show password"
+                        contentDescription = if (confirmPasswordVisible) "隐藏密码" else "显示密码"
                     )
                 }
             },
@@ -190,7 +190,7 @@ fun RegisterScreenContent(
         if (password != confirmPassword && confirmPassword.isNotEmpty()) {
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Passwords do not match",
+                text = "两次密码不一致",
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall
             )
@@ -220,14 +220,14 @@ fun RegisterScreenContent(
                     color = MaterialTheme.colorScheme.onPrimary
                 )
             } else {
-                Text("Register", style = MaterialTheme.typography.titleMedium)
+                Text("注册", style = MaterialTheme.typography.titleMedium)
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
         TextButton(onClick = onNavigateToLogin) {
-            Text("Already have an account? Login")
+            Text("已有账户？登录")
         }
     }
 }

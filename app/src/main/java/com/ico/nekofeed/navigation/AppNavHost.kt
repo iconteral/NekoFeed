@@ -27,6 +27,8 @@ import com.ico.nekofeed.ui.feed.FeedScreen
 import com.ico.nekofeed.ui.feed.FeedViewModel
 import com.ico.nekofeed.ui.profile.ProfileScreen
 import com.ico.nekofeed.ui.search.SearchScreen
+import com.ico.nekofeed.ui.search.SearchViewModel
+import com.ico.nekofeed.ui.settings.AiSettingsScreen
 import com.ico.nekofeed.ui.stats.StatsScreen
 
 @Composable
@@ -48,7 +50,7 @@ fun AppNavHost(
             LoginScreen(
                 viewModel = authViewModel,
                 onLoginSuccess = {
-                    navController.navigate("profile") {
+                    navController.navigate("main") {
                         popUpTo("login") { inclusive = true }
                     }
                 },
@@ -63,7 +65,7 @@ fun AppNavHost(
             RegisterScreen(
                 viewModel = authViewModel,
                 onRegisterSuccess = {
-                    navController.navigate("profile") {
+                    navController.navigate("main") {
                         popUpTo("register") { inclusive = true }
                     }
                 },
@@ -92,16 +94,18 @@ fun AppNavHost(
                             popUpTo(0) { inclusive = true }
                         }
                     },
+                    onLogin = { navController.navigate("login") },
                     onNavigateToLikes = { },
                     onNavigateToCollections = { },
                     onNavigateToHistory = { },
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.popBackStack() },
+                    onNavigateToAiSettings = { navController.navigate("ai_settings") }
                 )
             } else {
                 LoginScreen(
                     viewModel = authViewModel,
                     onLoginSuccess = {
-                        navController.navigate("profile") {
+                        navController.navigate("main") {
                             popUpTo("login") { inclusive = true }
                         }
                     },
@@ -110,6 +114,13 @@ fun AppNavHost(
                     }
                 )
             }
+        }
+
+        // AI Settings (outside main for direct navigation)
+        composable("ai_settings") {
+            AiSettingsScreen(
+                onBack = { navController.popBackStack() }
+            )
         }
     }
 }
@@ -181,13 +192,17 @@ private fun MainScreen(
             }
 
             composable("search") {
+                val searchViewModel: SearchViewModel = viewModel()
+                val feedUiState by feedViewModel.uiState.collectAsState()
                 SearchScreen(
                     onBack = { nestedNavController.popBackStack() },
                     onItemClick = { itemId ->
                         val encodedId = Uri.encode(itemId)
                         nestedNavController.navigate("detail/$encodedId")
                     },
-                    searchAds = { query -> feedViewModel.searchItems(query) }
+                    searchAds = { query -> feedViewModel.searchItems(query) },
+                    searchViewModel = searchViewModel,
+                    allItems = feedViewModel.getAllItems()
                 )
             }
 
@@ -203,23 +218,26 @@ private fun MainScreen(
             }
 
             composable("profile") {
-                val authState by authViewModel.uiState.collectAsState()
-                if (authState.isLoggedIn) {
-                    ProfileScreen(
-                        authViewModel = authViewModel,
-                        onLogout = {
-                            navController.navigate("main") {
-                                popUpTo(0) { inclusive = true }
-                            }
-                        },
-                        onNavigateToLikes = { },
-                        onNavigateToCollections = { },
-                        onNavigateToHistory = { },
-                        onBack = { nestedNavController.popBackStack() }
-                    )
-                } else {
-                    navController.navigate("login")
-                }
+                ProfileScreen(
+                    authViewModel = authViewModel,
+                    onLogout = {
+                        navController.navigate("main") {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    },
+                    onLogin = { navController.navigate("login") },
+                    onNavigateToLikes = { },
+                    onNavigateToCollections = { },
+                    onNavigateToHistory = { },
+                    onBack = { nestedNavController.popBackStack() },
+                    onNavigateToAiSettings = { nestedNavController.navigate("ai_settings") }
+                )
+            }
+
+            composable("ai_settings") {
+                AiSettingsScreen(
+                    onBack = { nestedNavController.popBackStack() }
+                )
             }
         }
     }

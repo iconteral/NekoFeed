@@ -102,7 +102,7 @@ fun LoginScreenContent(
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = "Login to your account",
+            text = "登录您的账户",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -112,7 +112,7 @@ fun LoginScreenContent(
         OutlinedTextField(
             value = username,
             onValueChange = onUsernameChange,
-            label = { Text("Username") },
+            label = { Text("用户名") },
             leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
@@ -125,13 +125,13 @@ fun LoginScreenContent(
         OutlinedTextField(
             value = password,
             onValueChange = onPasswordChange,
-            label = { Text("Password") },
+            label = { Text("密码") },
             leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
             trailingIcon = {
                 IconButton(onClick = onPasswordVisibilityToggle) {
                     Icon(
                         if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                        contentDescription = if (passwordVisible) "Hide password" else "Show password"
+                        contentDescription = if (passwordVisible) "隐藏密码" else "显示密码"
                     )
                 }
             },
@@ -172,14 +172,14 @@ fun LoginScreenContent(
                     color = MaterialTheme.colorScheme.onPrimary
                 )
             } else {
-                Text("Login", style = MaterialTheme.typography.titleMedium)
+                Text("登录", style = MaterialTheme.typography.titleMedium)
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
         TextButton(onClick = onNavigateToRegister) {
-            Text("Don't have an account? Register")
+            Text("没有账户？注册")
         }
     }
 }

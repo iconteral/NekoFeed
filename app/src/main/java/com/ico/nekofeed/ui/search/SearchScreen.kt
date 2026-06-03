@@ -45,10 +45,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.flow.MutableStateFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -67,14 +69,18 @@ import com.ico.nekofeed.ui.feed.components.FeedTagChip
 fun SearchScreen(
     onBack: () -> Unit,
     onItemClick: (String) -> Unit,
-    searchAds: (String) -> List<FeedItem>
+    searchAds: (String) -> List<FeedItem>,
+    searchViewModel: SearchViewModel? = null,
+    allItems: List<FeedItem> = emptyList()
 ) {
     var query by remember { mutableStateOf("") }
-    var isSearching by remember { mutableStateOf(false) }
-    var hasSearched by remember { mutableStateOf(false) }
-    var results by remember { mutableStateOf<List<FeedItem>>(emptyList()) }
-    var parsedKeywords by remember { mutableStateOf<List<String>>(emptyList()) }
-    var matchedTags by remember { mutableStateOf<List<String>>(emptyList()) }
+    val aiUiState by (searchViewModel?.uiState ?: remember { mutableStateFlow(com.ico.nekofeed.util.SearchUiState()) }).collectAsState()
+
+    val isSearching = aiUiState.isSearching || (searchViewModel == null && false)
+    val hasSearched = aiUiState.hasSearched
+    val results = aiUiState.results
+    val parsedKeywords = aiUiState.parsedKeywords
+    val matchedTags = aiUiState.matchedTags
 
     val suggestions = listOf(
         "学生党平价耳机",
@@ -87,56 +93,52 @@ fun SearchScreen(
 
     fun doSearch(q: String) {
         if (q.isBlank()) return
-        isSearching = true
-        hasSearched = false
-        // Simulate AI thinking delay
-        Thread.sleep(1200)
-        results = searchAds(q)
-        parsedKeywords = q.split(" ", "，", ",", "、").filter { it.isNotBlank() }
-        matchedTags = results.flatMap { it.displayTags }.distinct().take(5)
-        isSearching = false
-        hasSearched = true
+        if (searchViewModel != null && allItems.isNotEmpty()) {
+            searchViewModel.search(q, allItems)
+        } else {
+            searchViewModel?.clearResults()
+        }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Star,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "AI 对话搜索",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回"
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+    Column(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        TopAppBar(
+            title = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Star,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "AI 对话搜索",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            navigationIcon = {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "返回"
+                    )
+                }
+            },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.surface
             )
-        }
-    ) { paddingValues ->
+        )
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .weight(1f)
         ) {
             // 搜索输入框
             SearchInputField(
@@ -514,11 +516,6 @@ private fun SearchResultContent(
                     onClick = { onItemClick(item.id) }
                 )
             }
-        }
-
-        // 底部间距
-        item {
-            Spacer(modifier = Modifier.height(80.dp))
         }
     }
 }

@@ -13,7 +13,8 @@ data class FeedUiState(
     val selectedTags: List<String> = emptyList(),
     val playingItemId: String? = null,
     val errorMessage: String? = null,
-    val usingFallback: Boolean = false
+    val usingFallback: Boolean = false,
+    val isAiLoading: Boolean = false
 )
 
 data class FeedDetailUiState(

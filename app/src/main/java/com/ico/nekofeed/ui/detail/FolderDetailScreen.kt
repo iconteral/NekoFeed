@@ -66,63 +66,65 @@ fun FeedDetailScreen(
     onCollectClick: ((String) -> Unit)? = null,
     onShareClick: ((String) -> Unit)? = null
 ) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = item?.sourceName ?: "详情",
-                        style = MaterialTheme.typography.titleMedium
+    Column(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        TopAppBar(
+            title = {
+                Text(
+                    text = item?.sourceName ?: "详情",
+                    style = MaterialTheme.typography.titleMedium
+                )
+            },
+            navigationIcon = {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "返回"
                     )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回"
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                }
+            },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.surface
             )
-        },
-        bottomBar = {
-            if (item != null) {
-                DetailBottomBar(
-                    item = item,
-                    onLikeClick = onLikeClick,
-                    onCollectClick = onCollectClick,
-                    onShareClick = onShareClick
-                )
+        )
+
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+        ) {
+            if (item == null) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "未找到该 FeedItem，请返回首页重新加载",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    HeroMediaSection(item)
+                    ContentSection(item)
+                    // 不需要在这里加巨大的 Spacer 了，因为 BottomBar 不再是 Scaffold 浮动的
+                }
             }
         }
-    ) { paddingValues ->
-        if (item == null) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "未找到该 FeedItem，请返回首页重新加载",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-                    .verticalScroll(rememberScrollState())
-            ) {
-                HeroMediaSection(item)
-                ContentSection(item)
-                Spacer(modifier = Modifier.height(100.dp))
-            }
+
+        if (item != null) {
+            DetailBottomBar(
+                item = item,
+                onLikeClick = onLikeClick,
+                onCollectClick = onCollectClick,
+                onShareClick = onShareClick
+            )
         }
     }
 }
