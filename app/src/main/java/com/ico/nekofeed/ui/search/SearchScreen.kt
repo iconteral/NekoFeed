@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -32,14 +31,12 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -69,14 +66,14 @@ import com.ico.nekofeed.ui.feed.components.FeedTagChip
 fun SearchScreen(
     onBack: () -> Unit,
     onItemClick: (String) -> Unit,
-    searchAds: (String) -> List<FeedItem>,
     searchViewModel: SearchViewModel? = null,
     allItems: List<FeedItem> = emptyList()
 ) {
     var query by remember { mutableStateOf("") }
-    val aiUiState by (searchViewModel?.uiState ?: remember { mutableStateFlow(com.ico.nekofeed.util.SearchUiState()) }).collectAsState()
+    val aiUiState by (searchViewModel?.uiState?.collectAsState()
+        ?: remember { mutableStateOf(com.ico.nekofeed.util.SearchUiState()) })
 
-    val isSearching = aiUiState.isSearching || (searchViewModel == null && false)
+    val isSearching = aiUiState.isSearching
     val hasSearched = aiUiState.hasSearched
     val results = aiUiState.results
     val parsedKeywords = aiUiState.parsedKeywords
@@ -176,7 +173,6 @@ fun SearchScreen(
                 enter = fadeIn() + slideInVertically(tween(300)) { it / 2 }
             ) {
                 SearchResultContent(
-                    query = query,
                     keywords = parsedKeywords,
                     matchedTags = matchedTags,
                     results = results,
@@ -380,7 +376,6 @@ private fun AIThinkingDots() {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SearchResultContent(
-    query: String,
     keywords: List<String>,
     matchedTags: List<String>,
     results: List<FeedItem>,
@@ -555,8 +550,7 @@ fun SearchScreenPreview() {
     MaterialTheme {
         SearchScreen(
             onBack = {},
-            onItemClick = {},
-            searchAds = { emptyList() }
+            onItemClick = {}
         )
     }
 }

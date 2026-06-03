@@ -189,6 +189,10 @@ item_types 可选值：article, video, ad, product, local
         }
     }
 
+    suspend fun getCache(itemId: String): AiCacheEntity? {
+        return aiCacheDao.getCache(itemId)
+    }
+
     suspend fun getCacheCount(): Int {
         return aiCacheDao.getCacheCount()
     }

@@ -120,7 +120,7 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 aiRepository.batchGenerateAi(items)
                 val updatedItems = allItems.map { item ->
-                    val cached = aiRepository.aiCacheDao().getCache(item.id)
+                    val cached = aiRepository.getCache(item.id)
                     if (cached != null) {
                         item.copy(
                             aiSummary = cached.aiSummary ?: item.aiSummary,

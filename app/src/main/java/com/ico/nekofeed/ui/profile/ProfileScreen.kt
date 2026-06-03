@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -62,7 +63,8 @@ fun ProfileScreen(
     onNavigateToLikes: () -> Unit,
     onNavigateToCollections: () -> Unit,
     onNavigateToHistory: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onNavigateToAiSettings: () -> Unit = {}
 ) {
     val authState by authViewModel.uiState.collectAsState()
     var userStats by remember { mutableStateOf<UserStats?>(null) }
@@ -77,7 +79,8 @@ fun ProfileScreen(
         onNavigateToLikes = onNavigateToLikes,
         onNavigateToCollections = onNavigateToCollections,
         onNavigateToHistory = onNavigateToHistory,
-        onBack = onBack
+        onBack = onBack,
+        onNavigateToAiSettings = onNavigateToAiSettings
     )
 }
 
@@ -92,7 +95,8 @@ fun ProfileScreenContent(
     onNavigateToLikes: () -> Unit,
     onNavigateToCollections: () -> Unit,
     onNavigateToHistory: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onNavigateToAiSettings: () -> Unit = {}
 ) {
     val isLoggedIn = authState.isLoggedIn
 
@@ -244,6 +248,12 @@ fun ProfileScreenContent(
                             icon = Icons.Default.Lock,
                             title = "修改密码",
                             onClick = { }
+                        )
+                        Divider(modifier = Modifier.padding(horizontal = 16.dp))
+                        MenuItem(
+                            icon = Icons.Default.Settings,
+                            title = "AI 设置",
+                            onClick = onNavigateToAiSettings
                         )
                     }
                 }

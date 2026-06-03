@@ -193,14 +193,12 @@ private fun MainScreen(
 
             composable("search") {
                 val searchViewModel: SearchViewModel = viewModel()
-                val feedUiState by feedViewModel.uiState.collectAsState()
                 SearchScreen(
                     onBack = { nestedNavController.popBackStack() },
                     onItemClick = { itemId ->
                         val encodedId = Uri.encode(itemId)
                         nestedNavController.navigate("detail/$encodedId")
                     },
-                    searchAds = { query -> feedViewModel.searchItems(query) },
                     searchViewModel = searchViewModel,
                     allItems = feedViewModel.getAllItems()
                 )
