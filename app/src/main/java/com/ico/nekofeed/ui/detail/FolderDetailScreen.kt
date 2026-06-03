@@ -240,7 +240,7 @@ private fun ContentSection(item: FeedItem) {
         }
 
         // AI 智能总结模块
-        if (item.displaySummary.isNotBlank()) {
+        if (!item.aiSummary.isNullOrBlank()) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -291,7 +291,7 @@ private fun ContentSection(item: FeedItem) {
                     }
 
                     Text(
-                        text = item.displaySummary,
+                        text = item.aiSummary,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         lineHeight = MaterialTheme.typography.bodyMedium.lineHeight

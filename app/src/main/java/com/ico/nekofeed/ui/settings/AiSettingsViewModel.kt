@@ -1,6 +1,7 @@
 package com.ico.nekofeed.ui.settings
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.ico.nekofeed.data.local.LlmConfig
@@ -96,10 +97,12 @@ class AiSettingsViewModel(application: Application) : AndroidViewModel(applicati
         viewModelScope.launch {
             saveConfig()
             _uiState.update { it.copy(isTesting = true, testResult = null) }
+            Log.d("AiSettingsViewModel", "开始测试连接")
 
             val result = aiRepository.testConnection()
             result.fold(
                 onSuccess = { message ->
+                    Log.d("AiSettingsViewModel", "测试连接成功: $message")
                     _uiState.update {
                         it.copy(
                             isTesting = false,
@@ -109,6 +112,7 @@ class AiSettingsViewModel(application: Application) : AndroidViewModel(applicati
                     }
                 },
                 onFailure = { error ->
+                    Log.e("AiSettingsViewModel", "测试连接失败: ${error.message}", error)
                     _uiState.update {
                         it.copy(
                             isTesting = false,

@@ -1,5 +1,6 @@
 package com.ico.nekofeed.data.remote
 
+import android.util.Log
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -13,7 +14,14 @@ object LlmClientFactory {
             .writeTimeout(timeoutSeconds, TimeUnit.SECONDS)
             .build()
 
-        val url = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
+        // 移除末尾的 /v1，因为LlmApi中已包含v1前缀
+        var url = baseUrl.trimEnd('/')
+        if (url.endsWith("/v1")) {
+            url = url.dropLast(3)
+        }
+        url = "$url/"
+        
+        Log.d("LlmClientFactory", "创建API客户端: 原始URL=$baseUrl, 处理后URL=$url")
 
         return Retrofit.Builder()
             .baseUrl(url)

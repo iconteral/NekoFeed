@@ -1,5 +1,6 @@
 package com.ico.nekofeed.data.repository
 
+import android.util.Log
 import com.ico.nekofeed.data.local.TokenManager
 import com.ico.nekofeed.data.local.db.AiCacheDao
 import com.ico.nekofeed.data.local.db.AiCacheEntity
@@ -12,6 +13,8 @@ import com.ico.nekofeed.data.remote.ResponseFormat
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.delay
+import retrofit2.HttpException
+import java.io.IOException
 
 data class AiResult(
     val aiSummary: String?,
@@ -165,11 +168,11 @@ item_types 可选值：article, video, ad, product, local
     }
 
     suspend fun testConnection(): Result<String> {
+        val config = getConfig()
         return try {
             val api = getApi()
                 ?: return Result.failure(Exception("请先配置 AI Endpoint URL"))
 
-            val config = getConfig()
             val request = ChatRequest(
                 model = config.model,
                 messages = listOf(
@@ -180,11 +183,39 @@ item_types 可选值：article, video, ad, product, local
             )
 
             val auth = if (config.apiKey.isNotBlank()) "Bearer ${config.apiKey}" else ""
+            Log.d("AiRepository", "测试连接: URL=${config.baseUrl}, Model=${config.model}, Auth=${if (config.apiKey.isNotBlank()) "已设置" else "未设置"}")
+            
             val response = api.chatCompletion(auth, request)
             val content = response.choices.firstOrNull()?.message?.content ?: ""
 
+            Log.d("AiRepository", "连接成功: 响应内容=$content")
             Result.success("连接成功！模型：${config.model}")
+        } catch (e: HttpException) {
+            val errorBody = e.response()?.errorBody()?.string() ?: "无响应体"
+            val statusCode = e.code()
+            Log.e("AiRepository", "HTTP错误: 状态码=$statusCode, 错误体=$errorBody", e)
+            
+            val errorMsg = when (statusCode) {
+                404 -> {
+                    // 检查是否是URL路径问题
+                    if (config.baseUrl.contains("/v1")) {
+                        "404 Not Found: URL路径配置问题，请检查Endpoint URL是否正确（不需要包含/v1）"
+                    } else {
+                        "404 Not Found: API路径不存在，请检查Endpoint URL"
+                    }
+                }
+                401 -> "401 Unauthorized: API Key无效或未提供"
+                403 -> "403 Forbidden: 访问被拒绝，请检查API Key权限"
+                429 -> "429 Too Many Requests: 请求过于频繁，请稍后重试"
+                500, 502, 503 -> "$statusCode: 服务器错误，请稍后重试"
+                else -> "HTTP错误 $statusCode: $errorBody"
+            }
+            Result.failure(Exception(errorMsg))
+        } catch (e: IOException) {
+            Log.e("AiRepository", "网络IO错误: ${e.message}", e)
+            Result.failure(Exception("网络错误: ${e.message}"))
         } catch (e: Exception) {
+            Log.e("AiRepository", "连接失败: ${e.message}", e)
             Result.failure(Exception("连接失败：${e.message}"))
         }
     }

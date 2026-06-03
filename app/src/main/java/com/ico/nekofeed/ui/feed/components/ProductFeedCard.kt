@@ -148,7 +148,7 @@ fun ProductFeedCard(
             }
 
             // AI 摘要
-            if (item.displaySummary.isNotBlank()) {
+            if (!item.aiSummary.isNullOrBlank()) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -165,7 +165,7 @@ fun ProductFeedCard(
                         modifier = Modifier.padding(end = 8.dp)
                     )
                     Text(
-                        text = item.displaySummary,
+                        text = item.aiSummary,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         lineHeight = MaterialTheme.typography.bodySmall.lineHeight

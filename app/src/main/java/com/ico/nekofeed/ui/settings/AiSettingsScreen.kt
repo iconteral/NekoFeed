@@ -24,6 +24,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -147,9 +148,10 @@ fun AiSettingsScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 if (uiState.isTesting) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color = MaterialTheme.colorScheme.onPrimary
+                    LinearWavyProgressIndicator(
+                        modifier = Modifier.width(100.dp),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        trackColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.3f)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("测试中...")
@@ -307,9 +309,10 @@ fun AiSettingsScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 if (uiState.isSaving) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color = MaterialTheme.colorScheme.onPrimary
+                    LinearWavyProgressIndicator(
+                        modifier = Modifier.width(100.dp),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        trackColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.3f)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("保存中...")

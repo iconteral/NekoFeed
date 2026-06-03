@@ -64,7 +64,7 @@ fun SmallImageFeedCard(
             )
 
             // AI 摘要
-            if (item.displaySummary.isNotBlank()) {
+            if (!item.aiSummary.isNullOrBlank()) {
                 Row(
                     verticalAlignment = Alignment.Top,
                     modifier = Modifier.padding(bottom = 8.dp)
@@ -75,7 +75,7 @@ fun SmallImageFeedCard(
                         modifier = Modifier.padding(end = 4.dp)
                     )
                     Text(
-                        text = item.displaySummary,
+                        text = item.aiSummary,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 2,
