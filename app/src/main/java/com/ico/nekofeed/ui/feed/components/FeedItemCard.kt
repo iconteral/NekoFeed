@@ -27,6 +27,7 @@ fun FeedItemCard(
     onCollectClick: ((String) -> Unit)? = null,
     onShareClick: ((String) -> Unit)? = null,
     onTagClick: ((String) -> Unit)? = null,
+    isAiEnabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     var isPressed by remember { mutableStateOf(false) }
@@ -61,33 +62,38 @@ fun FeedItemCard(
                 onLikeClick = onLikeClick,
                 onCollectClick = onCollectClick,
                 onShareClick = onShareClick,
-                onTagClick = onTagClick
+                onTagClick = onTagClick,
+                isAiEnabled = isAiEnabled
             )
             FeedCardType.SMALL_IMAGE -> SmallImageFeedCard(
                 item = item,
                 onLikeClick = onLikeClick,
                 onCollectClick = onCollectClick,
-                onTagClick = onTagClick
+                onTagClick = onTagClick,
+                isAiEnabled = isAiEnabled
             )
             FeedCardType.VIDEO -> VideoFeedCard(
                 item = item,
                 onLikeClick = onLikeClick,
                 onCollectClick = onCollectClick,
                 onShareClick = onShareClick,
-                onTagClick = onTagClick
+                onTagClick = onTagClick,
+                isAiEnabled = isAiEnabled
             )
             FeedCardType.PRODUCT -> ProductFeedCard(
                 item = item,
                 onLikeClick = onLikeClick,
                 onCollectClick = onCollectClick,
                 onShareClick = onShareClick,
-                onTagClick = onTagClick
+                onTagClick = onTagClick,
+                isAiEnabled = isAiEnabled
             )
             FeedCardType.TEXT_ONLY -> SmallImageFeedCard(
                 item = item,
                 onLikeClick = onLikeClick,
                 onCollectClick = onCollectClick,
-                onTagClick = onTagClick
+                onTagClick = onTagClick,
+                isAiEnabled = isAiEnabled
             )
         }
     }

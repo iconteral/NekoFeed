@@ -74,44 +74,79 @@ class AiRepository(
 类型：${item.itemType ?: "未知"}
 原始摘要：${item.summary ?: "无"}"""
 
-        return try {
-            val request = ChatRequest(
-                model = config.model,
-                messages = listOf(
-                    ChatMessage("system", systemPrompt),
-                    ChatMessage("user", userPrompt)
-                ),
-                max_tokens = 256,
-                temperature = 0.3f,
-                response_format = ResponseFormat("json_object")
-            )
+        val request = ChatRequest(
+            model = config.model,
+            messages = listOf(
+                ChatMessage("system", systemPrompt),
+                ChatMessage("user", userPrompt)
+            ),
+            max_tokens = 256,
+            temperature = 0.3f,
+            response_format = ResponseFormat("json_object")
+        )
 
-            val auth = if (config.apiKey.isNotBlank()) "Bearer ${config.apiKey}" else ""
-            val response = api.chatCompletion(auth, request)
-            val content = response.choices.firstOrNull()?.message?.content ?: return null
+        val auth = if (config.apiKey.isNotBlank()) "Bearer ${config.apiKey}" else ""
 
-            val parsed = parseAiResponse(content)
+        var retryCount = 0
+        val maxRetries = 3
+        var backoffMs = 1000L
 
+        while (retryCount <= maxRetries) {
+            try {
+                val response = api.chatCompletion(auth, request)
+                val content = response.choices.firstOrNull()?.message?.content ?: return null
+
+                val parsed = parseAiResponse(content)
+
+                aiCacheDao.insertCache(
+                    AiCacheEntity(
+                        itemId = item.id,
+                        aiSummary = parsed.aiSummary,
+                        aiTags = gson.toJson(parsed.aiTags),
+                        aiReason = parsed.aiReason,
+                        modelUsed = config.model
+                    )
+                )
+
+                return AiResult(
+                    aiSummary = parsed.aiSummary,
+                    aiTags = parsed.aiTags,
+                    aiReason = parsed.aiReason,
+                    fromCache = false
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+                retryCount++
+                if (retryCount > maxRetries) {
+                    break
+                }
+                delay(backoffMs)
+                backoffMs *= 2
+            }
+        }
+
+        // Fallback when retries are exhausted
+        val fallbackTags = item.tags.orEmpty()
+        try {
             aiCacheDao.insertCache(
                 AiCacheEntity(
                     itemId = item.id,
-                    aiSummary = parsed.aiSummary,
-                    aiTags = gson.toJson(parsed.aiTags),
-                    aiReason = parsed.aiReason,
-                    modelUsed = config.model
+                    aiSummary = null,
+                    aiTags = gson.toJson(fallbackTags),
+                    aiReason = null,
+                    modelUsed = config.model + "-fallback"
                 )
             )
-
-            AiResult(
-                aiSummary = parsed.aiSummary,
-                aiTags = parsed.aiTags,
-                aiReason = parsed.aiReason,
-                fromCache = false
-            )
-        } catch (e: Exception) {
-            e.printStackTrace()
-            null
+        } catch (dbEx: Exception) {
+            dbEx.printStackTrace()
         }
+
+        return AiResult(
+            aiSummary = null,
+            aiTags = fallbackTags,
+            aiReason = null,
+            fromCache = false
+        )
     }
 
     suspend fun parseSearchQuery(query: String, userProfileTags: List<String>): SearchIntent? {

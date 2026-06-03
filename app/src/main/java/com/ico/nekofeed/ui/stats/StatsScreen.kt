@@ -29,11 +29,15 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -41,6 +45,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -73,7 +79,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.ico.nekofeed.ui.theme.StatRedEnd
 import com.ico.nekofeed.ui.theme.StatRedStart
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun StatsScreen(
     onBack: () -> Unit,
@@ -81,6 +87,15 @@ fun StatsScreen(
     onItemClick: (String) -> Unit
 ) {
     val stats = getStats()
+    var selectedSortIndex by remember { mutableIntStateOf(0) }
+    val sortOptions = listOf("按曝光", "按点赞", "按收藏")
+    val sortedItems = remember(stats.topItems, selectedSortIndex) {
+        when (selectedSortIndex) {
+            1 -> stats.topItems.sortedByDescending { it.likeCount }
+            2 -> stats.topItems.sortedByDescending { it.collectCount }
+            else -> stats.topItems.sortedByDescending { it.exposureCount }
+        }
+    }
 
     Column(
         modifier = Modifier.fillMaxSize()
@@ -150,14 +165,28 @@ fun StatsScreen(
                 }
             }
 
+            // 排序选项
+            item {
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    sortOptions.forEachIndexed { index, label ->
+                        SegmentedButton(
+                            shape = SegmentedButtonDefaults.itemShape(index = index, count = sortOptions.size),
+                            onClick = { selectedSortIndex = index },
+                            selected = selectedSortIndex == index,
+                            label = { Text(label) }
+                        )
+                    }
+                }
+            }
+
             // 排行榜列表
             itemsIndexed(
-                items = stats.topItems
+                items = sortedItems
             ) { index, item ->
                 RankingItem(
                     rank = index + 1,
                     item = item,
-                    maxExposure = stats.topItems.firstOrNull()?.exposureCount ?: 1,
+                    maxExposure = sortedItems.firstOrNull()?.exposureCount ?: 1,
                     onClick = { onItemClick(item.id) }
                 )
             }
@@ -405,7 +434,7 @@ private fun RankingItem(
                 }
 
                 // 进度条
-                LinearProgressIndicator(
+                LinearWavyProgressIndicator(
                     progress = { animatedProgress },
                     modifier = Modifier
                         .fillMaxWidth()

@@ -84,10 +84,6 @@ class TokenManager(private val context: Context) {
     }
 
     suspend fun getToken(): String? {
-        var tokenValue: String? = null
-        context.dataStore.data.collect { preferences ->
-            tokenValue = preferences[TOKEN_KEY]
-        }
-        return tokenValue
+        return context.dataStore.data.first()[TOKEN_KEY]
     }
 }

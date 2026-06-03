@@ -50,8 +50,15 @@ def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token"
         )
-    user_id: int = payload.get("sub")
+    user_id = payload.get("sub")
     if user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload"
+        )
+    try:
+        user_id = int(user_id)
+    except (ValueError, TypeError):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token payload"
@@ -80,8 +87,12 @@ def get_optional_user(
     payload = decode_token(token)
     if payload is None:
         return None
-    user_id: int = payload.get("sub")
+    user_id = payload.get("sub")
     if user_id is None:
+        return None
+    try:
+        user_id = int(user_id)
+    except (ValueError, TypeError):
         return None
     user = db.query(User).filter(User.id == user_id).first()
     if user and user.is_active:

@@ -4,10 +4,8 @@ import com.ico.nekofeed.data.local.TokenManager
 import com.ico.nekofeed.data.model.TokenResponse
 import com.ico.nekofeed.data.model.User
 import com.ico.nekofeed.data.remote.FeedApi
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class AuthRepository(
@@ -18,12 +16,14 @@ class AuthRepository(
     val token = tokenManager.token
     val username = tokenManager.username
 
-    init {
-        CoroutineScope(Dispatchers.IO).launch {
-            val savedToken = tokenManager.getToken()
-            if (savedToken != null) {
-                onTokenChanged?.invoke(savedToken)
-            }
+    /**
+     * 从 DataStore 恢复已保存的 token 到内存缓存。
+     * 必须在发起任何需要认证的 API 请求之前调用。
+     */
+    suspend fun restoreToken() {
+        val savedToken = tokenManager.getToken()
+        if (savedToken != null) {
+            onTokenChanged?.invoke(savedToken)
         }
     }
 

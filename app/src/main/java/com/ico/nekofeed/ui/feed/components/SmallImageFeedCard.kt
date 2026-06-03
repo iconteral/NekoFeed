@@ -33,14 +33,18 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.ico.nekofeed.data.model.FeedItem
+import androidx.compose.animation.Crossfade
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LinearWavyProgressIndicator
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SmallImageFeedCard(
     item: FeedItem,
     onLikeClick: ((String) -> Unit)? = null,
     onCollectClick: ((String) -> Unit)? = null,
     onTagClick: ((String) -> Unit)? = null,
+    isAiEnabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -63,41 +67,92 @@ fun SmallImageFeedCard(
                 modifier = Modifier.padding(bottom = 6.dp)
             )
 
-            // AI 摘要
-            if (!item.aiSummary.isNullOrBlank()) {
-                Row(
-                    verticalAlignment = Alignment.Top,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                ) {
-                    Text(
-                        text = "✨",
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.padding(end = 4.dp)
-                    )
-                    Text(
-                        text = item.aiSummary,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        lineHeight = MaterialTheme.typography.bodySmall.lineHeight
-                    )
-                }
-            }
+            Crossfade(
+                targetState = item.aiSummary to item.isAiLoading,
+                label = "ai_summary_transition"
+            ) { (summary, isLoading) ->
+                if (!summary.isNullOrBlank()) {
+                    Column {
+                        // AI 摘要
+                        Row(
+                            verticalAlignment = Alignment.Top,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        ) {
+                            Text(
+                                text = "✨",
+                                style = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier.padding(end = 4.dp)
+                            )
+                            Text(
+                                text = summary,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                lineHeight = MaterialTheme.typography.bodySmall.lineHeight
+                            )
+                        }
 
-            // 标签
-            if (item.displayTags.isNotEmpty()) {
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.padding(bottom = 8.dp)
-                ) {
-                    item.displayTags.take(2).forEach { tag ->
-                        FeedTagChip(
-                            tag = tag,
-                            onClick = { onTagClick?.invoke(tag) },
-                            small = true
-                        )
+                        // 标签
+                        if (item.displayTags.isNotEmpty()) {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            ) {
+                                item.displayTags.take(2).forEach { tag ->
+                                    FeedTagChip(
+                                        tag = tag,
+                                        onClick = { onTagClick?.invoke(tag) },
+                                        small = true
+                                    )
+                                }
+                            }
+                        }
+                    }
+                } else if (isAiEnabled && (isLoading || item.aiSummary == null)) {
+                    // Placeholder frame (缺省框体)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp)
+                            .background(
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.05f),
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                            .padding(8.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.padding(bottom = 6.dp)
+                        ) {
+                            Text(
+                                text = "✨",
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                            Text(
+                                text = "AI 正在分析文章...",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(16.dp),
+                            contentAlignment = Alignment.CenterStart
+                        ) {
+                            LinearWavyProgressIndicator(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(4.dp),
+                                color = MaterialTheme.colorScheme.primary,
+                                trackColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                            )
+                        }
                     }
                 }
             }

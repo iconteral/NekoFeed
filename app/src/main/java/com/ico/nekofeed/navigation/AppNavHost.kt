@@ -171,6 +171,9 @@ private fun MainScreen(
                     },
                     onStatsClick = {
                         nestedNavController.navigate("stats")
+                    },
+                    onAiSettingsClick = {
+                        nestedNavController.navigate("ai_settings")
                     }
                 )
             }
@@ -181,13 +184,16 @@ private fun MainScreen(
             ) { backStackEntry ->
                 val itemId = backStackEntry.arguments?.getString("itemId") ?: ""
                 val decodedId = Uri.decode(itemId)
-                val item = remember(decodedId) { feedViewModel.getItemById(decodedId) }
+                val uiState by feedViewModel.uiState.collectAsState()
+                val item = remember(decodedId, uiState.items) { feedViewModel.getItemById(decodedId) }
                 FeedDetailScreen(
                     item = item,
                     onBack = { nestedNavController.popBackStack() },
                     onLikeClick = { id -> feedViewModel.toggleLike(id) },
                     onCollectClick = { id -> feedViewModel.toggleCollect(id) },
-                    onShareClick = { id -> feedViewModel.toggleShare(id) }
+                    onShareClick = { id -> feedViewModel.toggleShare(id) },
+                    isAiEnabled = uiState.isAiEnabled,
+                    onAiRequest = { feedViewModel.requestAiAnalysis(it) }
                 )
             }
 

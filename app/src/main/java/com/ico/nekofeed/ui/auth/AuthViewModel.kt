@@ -28,6 +28,8 @@ class AuthViewModel(private val authRepository: AuthRepository) : ViewModel() {
 
     private fun checkLoginStatus() {
         viewModelScope.launch {
+            // 先从 DataStore 恢复 token 到内存缓存
+            authRepository.restoreToken()
             val isLoggedIn = authRepository.isLoggedIn()
             _uiState.value = _uiState.value.copy(isLoggedIn = isLoggedIn)
             if (isLoggedIn) {

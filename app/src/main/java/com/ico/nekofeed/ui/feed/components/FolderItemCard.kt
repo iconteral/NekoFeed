@@ -200,7 +200,7 @@ private fun SourceAndTags(item: FeedItem) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        if (item.tags.isNotEmpty()) {
+        if (!item.tags.isNullOrEmpty()) {
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = item.tags.joinToString(" ") { "#$it" },

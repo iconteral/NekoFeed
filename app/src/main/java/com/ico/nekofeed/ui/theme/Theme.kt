@@ -13,7 +13,15 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
+
+object ExpressiveTokens {
+    val SplitButtonOuterCorner = 20.dp
+    val SplitButtonInnerCorner = 0.dp
+    val WaveAmplitude = 1f
+    val WaveSpeed = 1f
+}
 
 private val DarkColorScheme = darkColorScheme(
     primary = PrimaryLight,

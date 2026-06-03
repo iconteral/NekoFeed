@@ -30,13 +30,13 @@ data class FeedItem(
     val mediaUrl: String?,
 
     // 原始标签（来自服务器）
-    val tags: List<String> = emptyList(),
+    val tags: List<String>? = emptyList(),
 
     // AI 结果
     @SerializedName("ai_summary")
     val aiSummary: String? = null,
     @SerializedName("ai_tags")
-    val aiTags: List<String> = emptyList(),
+    val aiTags: List<String>? = emptyList(),
     @SerializedName("ai_reason")
     val aiReason: String? = null,
 
@@ -73,7 +73,8 @@ data class FeedItem(
     @SerializedName("published_at")
     val publishedAt: String?,
     @SerializedName("created_at")
-    val createdAt: String? = null
+    val createdAt: String? = null,
+    val isAiLoading: Boolean = false
 ) {
     // 便捷属性：获取显示用的摘要（优先AI摘要，其次原始摘要）
     val displaySummary: String
@@ -81,11 +82,7 @@ data class FeedItem(
 
     // 便捷属性：获取显示用的标签（优先AI标签，其次原始标签）
     val displayTags: List<String>
-        get() = when {
-            !aiTags.isNullOrEmpty() -> aiTags
-            !tags.isNullOrEmpty() -> tags
-            else -> emptyList()
-        }
+        get() = if (!aiTags.isNullOrEmpty()) aiTags else tags.orEmpty()
 
     // 便捷属性：判断是否为视频类型
     val isVideo: Boolean

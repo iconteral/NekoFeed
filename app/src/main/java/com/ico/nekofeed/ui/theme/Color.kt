@@ -6,7 +6,7 @@ import androidx.compose.ui.graphics.Color
 val Primary = Color(0xFF5C4DFF)
 val PrimaryDark = Color(0xFF4A3DE0)
 val PrimaryLight = Color(0xFF8B7FFF)
-val PrimarySoft = Color(0x1F5C4DFF) // 12% opacity
+val PrimarySoft = Color(0xFFE8E7FF)  // Solid light blue-purple
 val PrimaryGlow = Color(0x405C4DFF) // 25% opacity
 
 // Secondary - 紫罗兰

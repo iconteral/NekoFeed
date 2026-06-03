@@ -14,7 +14,8 @@ data class FeedUiState(
     val playingItemId: String? = null,
     val errorMessage: String? = null,
     val usingFallback: Boolean = false,
-    val isAiLoading: Boolean = false
+    val isAiLoading: Boolean = false,
+    val isAiEnabled: Boolean = true
 )
 
 data class FeedDetailUiState(

@@ -6,13 +6,14 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [AiCacheEntity::class, UserProfileEntity::class],
-    version = 1,
+    entities = [AiCacheEntity::class, UserProfileEntity::class, FeedItemInteractionEntity::class],
+    version = 2,
     exportSchema = false
 )
 abstract class NekoFeedDatabase : RoomDatabase() {
     abstract fun aiCacheDao(): AiCacheDao
     abstract fun userProfileDao(): UserProfileDao
+    abstract fun feedItemInteractionDao(): FeedItemInteractionDao
 
     companion object {
         @Volatile
@@ -25,7 +26,7 @@ abstract class NekoFeedDatabase : RoomDatabase() {
                     NekoFeedDatabase::class.java,
                     "neko_feed_db"
                 )
-                    .fallbackToDestructiveMigration()
+                    .fallbackToDestructiveMigration(dropAllTables = true)
                     .build()
                     .also { INSTANCE = it }
             }

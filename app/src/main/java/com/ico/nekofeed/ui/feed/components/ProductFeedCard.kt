@@ -16,17 +16,27 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.outlined.Bookmark
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SplitButtonDefaults
+import androidx.compose.material3.SplitButtonLayout
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,8 +49,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.ico.nekofeed.data.model.FeedItem
+import androidx.compose.animation.Crossfade
+import androidx.compose.material3.LinearWavyProgressIndicator
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ProductFeedCard(
     item: FeedItem,
@@ -48,6 +60,7 @@ fun ProductFeedCard(
     onCollectClick: ((String) -> Unit)? = null,
     onShareClick: ((String) -> Unit)? = null,
     onTagClick: ((String) -> Unit)? = null,
+    isAiEnabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier) {
@@ -147,46 +160,92 @@ fun ProductFeedCard(
                 }
             }
 
-            // AI 摘要
-            if (!item.aiSummary.isNullOrBlank()) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.12f),
-                            RoundedCornerShape(10.dp)
-                        )
-                        .padding(10.dp, 12.dp),
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Text(
-                        text = "✨",
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(end = 8.dp)
-                    )
-                    Text(
-                        text = item.aiSummary,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        lineHeight = MaterialTheme.typography.bodySmall.lineHeight
-                    )
-                }
-                Spacer(modifier = Modifier.height(10.dp))
-            }
+            Crossfade(
+                targetState = item.aiSummary to item.isAiLoading,
+                label = "ai_analysis_transition"
+            ) { (summary, isLoading) ->
+                if (!summary.isNullOrBlank()) {
+                    Column {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.12f),
+                                    RoundedCornerShape(10.dp)
+                                )
+                                .padding(10.dp, 12.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Text(
+                                text = "✨",
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(end = 8.dp)
+                            )
+                            Text(
+                                text = summary,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = MaterialTheme.typography.bodySmall.lineHeight
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
 
-            // 标签
-            if (item.displayTags.isNotEmpty()) {
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.padding(bottom = 14.dp)
-                ) {
-                    item.displayTags.forEach { tag ->
-                        FeedTagChip(
-                            tag = tag,
-                            onClick = { onTagClick?.invoke(tag) }
-                        )
+                        if (item.displayTags.isNotEmpty()) {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.padding(bottom = 14.dp)
+                            ) {
+                                item.displayTags.forEach { tag ->
+                                    FeedTagChip(
+                                        tag = tag,
+                                        onClick = { onTagClick?.invoke(tag) }
+                                    )
+                                }
+                            }
+                        }
                     }
+                } else if (isAiEnabled && (isLoading || item.aiSummary == null)) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.05f),
+                                RoundedCornerShape(10.dp)
+                            )
+                            .padding(10.dp, 12.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        ) {
+                            Text(
+                                text = "✨",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Text(
+                                text = "AI 正在分析商品卖点与特征...",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        
+                        Box(
+                            modifier = Modifier.fillMaxWidth().height(16.dp),
+                            contentAlignment = Alignment.CenterStart
+                        ) {
+                            LinearWavyProgressIndicator(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(4.dp),
+                                color = MaterialTheme.colorScheme.primary,
+                                trackColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
                 }
             }
 
@@ -264,27 +323,56 @@ fun ProductFeedCard(
 
             // CTA 按钮
             if (item.ctaText != null) {
-                Button(
-                    onClick = { /* 处理CTA点击 */ },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 12.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
+                var menuExpanded by remember { mutableStateOf(false) }
+
+                Box(modifier = Modifier.padding(top = 12.dp)) {
+                    SplitButtonLayout(
+                        leadingButton = {
+                            SplitButtonDefaults.LeadingButton(
+                                onClick = { /* 处理CTA点击 */ }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.ShoppingCart,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.size(8.dp))
+                                Text(
+                                    text = item.ctaText,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        },
+                        trailingButton = {
+                            SplitButtonDefaults.TrailingButton(
+                                onClick = { menuExpanded = true }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowDown,
+                                    contentDescription = "更多选项"
+                                )
+                            }
+                        }
                     )
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.ShoppingCart,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.size(8.dp))
-                    Text(
-                        text = item.ctaText,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold
-                    )
+
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("加入购物车") },
+                            onClick = { menuExpanded = false }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("联系商家") },
+                            onClick = { menuExpanded = false }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("查看相似推荐") },
+                            onClick = { menuExpanded = false }
+                        )
+                    }
                 }
             }
         }

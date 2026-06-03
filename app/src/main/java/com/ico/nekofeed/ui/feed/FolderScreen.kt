@@ -23,18 +23,23 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.PrimaryScrollableTabRow
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -45,10 +50,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -61,12 +70,16 @@ import com.ico.nekofeed.data.model.FeedCategory
 import com.ico.nekofeed.data.model.FeedItem
 import com.ico.nekofeed.ui.feed.components.FeedItemCard
 import com.ico.nekofeed.util.FeedUiState
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun FeedScreen(
     onItemClick: (String) -> Unit,
     onSearchClick: () -> Unit = {},
     onStatsClick: () -> Unit = {},
+    onAiSettingsClick: () -> Unit = {},
     viewModel: FeedViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -76,38 +89,46 @@ fun FeedScreen(
         onItemClick = onItemClick,
         onSearchClick = onSearchClick,
         onStatsClick = onStatsClick,
+        onAiSettingsClick = onAiSettingsClick,
         onCategorySelected = viewModel::selectCategory,
         onRefresh = viewModel::refresh,
         onRetry = viewModel::retry,
+        onLoadMore = viewModel::loadMore,
         onLikeClick = viewModel::toggleLike,
         onCollectClick = viewModel::toggleCollect,
         onShareClick = viewModel::toggleShare,
-        onTagClick = viewModel::filterByTag
+        onTagClick = viewModel::filterByTag,
+        onAiRequest = viewModel::requestAiAnalysis
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun FeedScreenContent(
     uiState: FeedUiState,
     onItemClick: (String) -> Unit,
     onSearchClick: () -> Unit,
     onStatsClick: () -> Unit,
+    onAiSettingsClick: () -> Unit,
     onCategorySelected: (FeedCategory) -> Unit,
     onRefresh: () -> Unit,
     onRetry: () -> Unit,
+    onLoadMore: () -> Unit,
     onLikeClick: (String) -> Unit,
     onCollectClick: (String) -> Unit,
     onShareClick: (String) -> Unit,
-    onTagClick: (String) -> Unit
+    onTagClick: (String) -> Unit,
+    onAiRequest: (FeedItem) -> Unit
 ) {
     val listState = rememberLazyListState()
+    var fabExpanded by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        // 1. 顶部标题栏直接放在 Column 顶部
-        TopAppBar(
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            // 1. 顶部标题栏
+            TopAppBar(
             title = {
                 Row(
                     verticalAlignment = Alignment.CenterVertically
@@ -183,14 +204,111 @@ fun FeedScreenContent(
                     FeedContent(
                         items = uiState.items,
                         usingFallback = uiState.usingFallback,
+                        isLoadingMore = uiState.isLoadingMore,
+                        hasMore = uiState.hasMore,
                         listState = listState,
+                        isAiEnabled = uiState.isAiEnabled,
                         onItemClick = onItemClick,
+                        onLoadMore = onLoadMore,
                         onLikeClick = onLikeClick,
                         onCollectClick = onCollectClick,
                         onShareClick = onShareClick,
-                        onTagClick = onTagClick
+                        onTagClick = onTagClick,
+                        onAiRequest = onAiRequest
                     )
                 }
+            }
+        }
+        }
+
+        // FAB 浮动菜单
+        Column(
+            horizontalAlignment = Alignment.End,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp)
+        ) {
+            androidx.compose.animation.AnimatedVisibility(
+                visible = fabExpanded,
+                enter = fadeIn() + slideInVertically(
+                    initialOffsetY = { it },
+                    animationSpec = spring(dampingRatio = 0.6f)
+                ),
+                exit = fadeOut()
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.padding(bottom = 16.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "AI 设置",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        SmallFloatingActionButton(
+                            onClick = {
+                                fabExpanded = false
+                                onAiSettingsClick()
+                            },
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer
+                        ) {
+                            Icon(Icons.Filled.Settings, contentDescription = "AI 设置")
+                        }
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "数据统计",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        SmallFloatingActionButton(
+                            onClick = {
+                                fabExpanded = false
+                                onStatsClick()
+                            },
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer
+                        ) {
+                            Icon(Icons.Filled.BarChart, contentDescription = "数据统计")
+                        }
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "AI 搜索",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        SmallFloatingActionButton(
+                            onClick = {
+                                fabExpanded = false
+                                onSearchClick()
+                            },
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "AI 搜索")
+                        }
+                    }
+                }
+            }
+            FloatingActionButton(
+                onClick = { fabExpanded = !fabExpanded },
+                containerColor = MaterialTheme.colorScheme.primaryContainer
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Star,
+                    contentDescription = "AI 助手",
+//                    modifier = Modifier.rotate(if (fabExpanded) 45f else 0f)
+                )
             }
         }
     }
@@ -274,13 +392,35 @@ private fun AISearchBar(onClick: () -> Unit) {
 private fun FeedContent(
     items: List<FeedItem>,
     usingFallback: Boolean,
+    isLoadingMore: Boolean,
+    hasMore: Boolean,
     listState: LazyListState,
+    isAiEnabled: Boolean,
     onItemClick: (String) -> Unit,
+    onLoadMore: () -> Unit,
     onLikeClick: (String) -> Unit,
     onCollectClick: (String) -> Unit,
     onShareClick: (String) -> Unit,
-    onTagClick: (String) -> Unit
+    onTagClick: (String) -> Unit,
+    onAiRequest: (FeedItem) -> Unit
 ) {
+    // Infinite scroll detection: trigger loadMore when scrolled near the bottom
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            val layoutInfo = listState.layoutInfo
+            val totalItemsCount = layoutInfo.totalItemsCount
+            val lastVisibleItemIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            lastVisibleItemIndex to totalItemsCount
+        }
+            .distinctUntilChanged()
+            .filter { (lastVisible, totalCount) ->
+                totalCount > 0 && lastVisible >= totalCount - 3
+            }
+            .collect {
+                onLoadMore()
+            }
+    }
+
     LazyColumn(
         state = listState,
         contentPadding = PaddingValues(16.dp),
@@ -313,20 +453,59 @@ private fun FeedContent(
             items = items,
             key = { it.id }
         ) { item ->
+            LaunchedEffect(item.id, isAiEnabled) {
+                if (isAiEnabled) {
+                    onAiRequest(item)
+                }
+            }
+
             FeedItemCard(
                 item = item,
                 onClick = { onItemClick(item.id) },
                 onLikeClick = onLikeClick,
                 onCollectClick = onCollectClick,
                 onShareClick = onShareClick,
-                onTagClick = onTagClick
+                onTagClick = onTagClick,
+                isAiEnabled = isAiEnabled
             )
         }
 
-        // 删掉了多余的 80dp Spacer
+        // Bottom loading indicator
+        if (isLoadingMore) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        }
+
+        // End of feed indicator
+        if (!hasMore && items.isNotEmpty() && !usingFallback) {
+            item {
+                Text(
+                    text = "— 已经到底啦 —",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun FeedLoadingContent() {
     Box(
@@ -337,10 +516,8 @@ private fun FeedLoadingContent() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            LinearWavyProgressIndicator(
-                modifier = Modifier.width(200.dp),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant
+            LoadingIndicator(
+                color = MaterialTheme.colorScheme.primary
             )
             Text(
                 text = "加载中...",
@@ -395,13 +572,16 @@ fun FeedScreenPreview() {
             onItemClick = {},
             onSearchClick = {},
             onStatsClick = {},
+            onAiSettingsClick = {},
             onCategorySelected = {},
             onRefresh = {},
             onRetry = {},
+            onLoadMore = {},
             onLikeClick = {},
             onCollectClick = {},
             onShareClick = {},
-            onTagClick = {}
+            onTagClick = {},
+            onAiRequest = {}
         )
     }
 }

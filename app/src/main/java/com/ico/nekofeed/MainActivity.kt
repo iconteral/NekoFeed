@@ -10,6 +10,8 @@ import com.ico.nekofeed.data.repository.AuthRepository
 import com.ico.nekofeed.data.repository.UserRepository
 import com.ico.nekofeed.navigation.AppNavHost
 import com.ico.nekofeed.ui.theme.NekoFeedTheme
+import java.util.concurrent.atomic.AtomicReference
+import kotlinx.coroutines.runBlocking
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -17,16 +19,19 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         val tokenManager = TokenManager(applicationContext)
-        var cachedToken: String? = null
+        val cachedToken = AtomicReference<String?>(null)
 
-        // 每次从 DataStore 获取 token 会在 IO 线程
+        // tokenProvider 在 OkHttp 线程上调用，AtomicReference 保证可见性
         RetrofitClient.setTokenProvider {
-            cachedToken
+            cachedToken.get()
         }
 
         val authRepository = AuthRepository(RetrofitClient.feedApi, tokenManager) { newToken ->
-            cachedToken = newToken
+            cachedToken.set(newToken)
         }
+
+        runBlocking { authRepository.restoreToken() }
+
         val userRepository = UserRepository(RetrofitClient.feedApi)
 
         setContent {
