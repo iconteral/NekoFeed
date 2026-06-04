@@ -12,7 +12,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -48,12 +48,14 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.animation.Crossfade
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LinearWavyProgressIndicator
@@ -68,6 +70,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import android.content.pm.ActivityInfo
+import android.app.Activity
+import androidx.core.view.WindowInsetsControllerCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
@@ -88,34 +93,59 @@ fun FeedDetailScreen(
     isAiEnabled: Boolean = true,
     onAiRequest: ((FeedItem) -> Unit)? = null
 ) {
+    var isFullscreen by rememberSaveable { mutableStateOf(false) }
+    val context = LocalContext.current
+
     LaunchedEffect(item?.id, isAiEnabled) {
         if (item != null && isAiEnabled) {
             onAiRequest?.invoke(item)
         }
     }
 
+    // 管理全屏状态下的系统栏和屏幕方向
+    LaunchedEffect(isFullscreen) {
+        val activity = context as? Activity ?: return@LaunchedEffect
+        val window = activity.window
+        val controller = WindowInsetsControllerCompat(window, window.decorView)
+        
+        if (isFullscreen) {
+            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        } else {
+            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            controller.show(WindowInsetsCompat.Type.systemBars())
+        }
+    }
+
+    BackHandler(enabled = isFullscreen) {
+        isFullscreen = false
+    }
+
     Column(
         modifier = Modifier.fillMaxSize()
     ) {
-        TopAppBar(
-            title = {
-                Text(
-                    text = item?.sourceName ?: "详情",
-                    style = MaterialTheme.typography.titleMedium
-                )
-            },
-            navigationIcon = {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "返回"
+        if (!isFullscreen) {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = item?.sourceName ?: "详情",
+                        style = MaterialTheme.typography.titleMedium
                     )
-                }
-            },
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = MaterialTheme.colorScheme.surface
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "返回"
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
             )
-        )
+        }
 
         Box(
             modifier = Modifier
@@ -137,16 +167,21 @@ fun FeedDetailScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
+                        .then(if (isFullscreen) Modifier else Modifier.verticalScroll(rememberScrollState()))
                 ) {
-                    HeroMediaSection(item)
-                    ContentSection(item, isAiEnabled)
-                    // 不需要在这里加巨大的 Spacer 了，因为 BottomBar 不再是 Scaffold 浮动的
+                    HeroMediaSection(
+                        item = item,
+                        isFullscreen = isFullscreen,
+                        onFullscreenToggle = { isFullscreen = it }
+                    )
+                    if (!isFullscreen) {
+                        ContentSection(item, isAiEnabled)
+                    }
                 }
             }
         }
 
-        if (item != null) {
+        if (item != null && !isFullscreen) {
             DetailBottomBar(
                 item = item,
                 onLikeClick = onLikeClick,
@@ -158,10 +193,13 @@ fun FeedDetailScreen(
 }
 
 @Composable
-private fun HeroMediaSection(item: FeedItem) {
+private fun HeroMediaSection(
+    item: FeedItem,
+    isFullscreen: Boolean,
+    onFullscreenToggle: (Boolean) -> Unit
+) {
     val context = LocalContext.current
     val playerManager = remember { PlayerManager.getInstance(context) }
-    var isFullscreen by remember { mutableStateOf(false) }
 
     // 当进入详情页且是视频时，自动播放并解除静音
     LaunchedEffect(item.id) {
@@ -174,56 +212,18 @@ private fun HeroMediaSection(item: FeedItem) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(300.dp)
+            .then(if (isFullscreen) Modifier.fillMaxHeight() else Modifier.height(300.dp))
             .background(Color.Black),
         contentAlignment = Alignment.Center
     ) {
         if (item.isVideo) {
-            if (isFullscreen) {
-                Dialog(
-                    onDismissRequest = { isFullscreen = false },
-                    properties = DialogProperties(
-                        usePlatformDefaultWidth = false,
-                        dismissOnBackPress = true
-                    )
-                ) {
-                    val activity = context as? androidx.activity.ComponentActivity
-                    androidx.compose.runtime.DisposableEffect(Unit) {
-                        val originalOrientation = activity?.requestedOrientation ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-                        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-                        onDispose {
-                            activity?.requestedOrientation = originalOrientation
-                        }
-                    }
-                    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-                        AndroidView(
-                            factory = { ctx ->
-                                androidx.media3.ui.PlayerView(ctx).apply {
-                                    useController = true
-                                    player = playerManager.exoPlayer
-                                    setFullscreenButtonClickListener { fullscreen -> 
-                                        isFullscreen = fullscreen 
-                                    }
-                                }
-                            },
-                            update = { view ->
-                                if (view.player != playerManager.exoPlayer) {
-                                    view.player = playerManager.exoPlayer
-                                }
-                            },
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-                }
-            }
-
             AndroidView(
                 factory = { ctx ->
                     androidx.media3.ui.PlayerView(ctx).apply {
                         useController = true // 详情页显示控制器
                         player = playerManager.exoPlayer
                         setFullscreenButtonClickListener { fullscreen -> 
-                            isFullscreen = fullscreen 
+                            onFullscreenToggle(fullscreen)
                         }
                     }
                 },
@@ -231,6 +231,7 @@ private fun HeroMediaSection(item: FeedItem) {
                     if (view.player != playerManager.exoPlayer) {
                         view.player = playerManager.exoPlayer
                     }
+                    // 同步全屏按钮的状态，如果 UI 是由外部状态控制的
                 },
                 modifier = Modifier.fillMaxSize()
             )
@@ -264,7 +265,7 @@ private fun HeroMediaSection(item: FeedItem) {
         }
 
         // 品牌标签
-        if (item.brand != null) {
+        if (item.brand != null && !isFullscreen) {
             Box(
                 modifier = Modifier
                     .padding(16.dp)
