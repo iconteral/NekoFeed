@@ -64,7 +64,10 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True, nullable=False)
-    hashed_password = Column(String, nullable=False)
+    hashed_password = Column(String, nullable=True)  # nullable: 设备用户没有密码
+    device_id = Column(String, unique=True, nullable=True, index=True)  # 设备唯一标识
+    is_device = Column(Boolean, default=False)  # 标记设备用户
+    linked_user_id = Column(Integer, nullable=True)  # 登录后绑定到真实用户
     avatar = Column(String, nullable=True)
     bio = Column(Text, nullable=True)
     level = Column(String, default="Normal") # Normal, Gold, VIP

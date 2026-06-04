@@ -86,7 +86,7 @@ fun StatsScreen(
     getStats: () -> StatsData,
     onItemClick: (String) -> Unit
 ) {
-    val stats = getStats()
+    val stats = remember { getStats() }
     var selectedSortIndex by remember { mutableIntStateOf(0) }
     val sortOptions = listOf("按曝光", "按点赞", "按收藏")
     val sortedItems = remember(stats.topItems, selectedSortIndex) {

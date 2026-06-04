@@ -13,6 +13,12 @@
         {% if item.is_custom %}
         <span class="badge" style="background-color: #f1c40f;">Custom</span>
         {% endif %}
+        {% if item.ai_enriched %}
+        <span class="badge" style="background-color: #2ecc71; color: white;">AI Enriched</span>
+        {% endif %}
+        {% if item.is_sponsored %}
+        <span class="badge" style="background-color: #e67e22; color: white;">Sponsored</span>
+        {% endif %}
     </div>
 
     <h1 style="margin-top: 10px;">{{ item.title }}</h1>
@@ -21,6 +27,9 @@
         <strong>Source:</strong> {{ item.source_name or 'N/A' }} <br>
         <strong>Published:</strong> {{ item.published_at.strftime('%Y-%m-%d %H:%M:%S') if item.published_at else 'N/A' }} <br>
         <strong>Link:</strong> {% if item.source_url %}<a href="{{ item.source_url }}" target="_blank">{{ item.source_url }}</a>{% else %}N/A{% endif %}
+        {% if item.brand %}<br><strong>Brand:</strong> {{ item.brand }}{% endif %}
+        {% if item.cta_text %}<br><strong>CTA:</strong> {{ item.cta_text }}{% endif %}
+        {% if item.price_text %}<br><strong>Price:</strong> {{ item.price_text }}{% endif %}
     </div>
 
     {% if item.local_image_path or item.image_url %}
@@ -34,6 +43,34 @@
     {% if item.local_media_path or item.media_url %}
     <div style="margin-bottom: 20px; background: #eee; padding: 10px; border-radius: 8px;">
         <strong>Media URL attached:</strong> {{ item.local_media_path or item.media_url }}
+    </div>
+    {% endif %}
+
+    {% if item.tags %}
+    <div style="margin-bottom: 20px;">
+        <strong>Tags:</strong>
+        {% for tag in item.tags.split(',') %}
+        <span class="badge">{{ tag.strip() }}</span>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if item.ai_summary or item.ai_tags or item.ai_reason %}
+    <div style="background: #eaf7ee; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #2ecc71;">
+        <h3 style="margin-top: 0; color: #27ae60;">AI Enrichment</h3>
+        {% if item.ai_summary %}
+        <p><strong>Summary:</strong> {{ item.ai_summary }}</p>
+        {% endif %}
+        {% if item.ai_tags %}
+        <p><strong>AI Tags:</strong>
+            {% for tag in item.ai_tags.split(',') %}
+            <span class="badge" style="background-color: #d5f5e3;">{{ tag.strip() }}</span>
+            {% endfor %}
+        </p>
+        {% endif %}
+        {% if item.ai_reason %}
+        <p><strong>Reason:</strong> {{ item.ai_reason }}</p>
+        {% endif %}
     </div>
     {% endif %}
 
@@ -51,8 +88,11 @@
     </div>
     {% endif %}
     
-    <form action="/admin/items/{{ item.id }}/delete" method="post" style="margin-top: 20px;" onsubmit="return confirm('Delete this item?');">
-        <button type="submit" class="btn btn-danger">Delete Item</button>
-    </form>
+    <div style="display: flex; gap: 10px; margin-top: 20px;">
+        <a href="/admin/items/{{ item.id }}/edit" class="btn" style="flex: 1; text-align: center; background-color: #27ae60;">Edit Item</a>
+        <form action="/admin/items/{{ item.id }}/delete" method="post" style="margin: 0; flex: 1;" onsubmit="return confirm('Delete this item?');">
+            <button type="submit" class="btn btn-danger" style="width: 100%;">Delete Item</button>
+        </form>
+    </div>
 </div>
 {% endblock %}

@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Header
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from .database import get_db
@@ -39,51 +39,8 @@ def decode_token(token: str) -> Optional[dict]:
         return None
 
 
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_db)
-) -> User:
-    token = credentials.credentials
-    payload = decode_token(token)
-    if payload is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token"
-        )
-    user_id = payload.get("sub")
-    if user_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token payload"
-        )
-    try:
-        user_id = int(user_id)
-    except (ValueError, TypeError):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token payload"
-        )
-    user = db.query(User).filter(User.id == user_id).first()
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found"
-        )
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User is disabled"
-        )
-    return user
-
-
-def get_optional_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False)),
-    db: Session = Depends(get_db)
-) -> Optional[User]:
-    if credentials is None:
-        return None
-    token = credentials.credentials
+def _resolve_token(token: str, db: Session) -> Optional[User]:
+    """从 token 解析用户"""
     payload = decode_token(token)
     if payload is None:
         return None
@@ -97,4 +54,60 @@ def get_optional_user(
     user = db.query(User).filter(User.id == user_id).first()
     if user and user.is_active:
         return user
+    return None
+
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
+) -> User:
+    token = credentials.credentials
+    user = _resolve_token(token, db)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token"
+        )
+    return user
+
+
+def get_optional_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False)),
+    db: Session = Depends(get_db)
+) -> Optional[User]:
+    if credentials is None:
+        return None
+    return _resolve_token(credentials.credentials, db)
+
+
+def get_or_create_device_user(
+    device_id: Optional[str] = Header(None, alias="X-Device-Id"),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False)),
+    db: Session = Depends(get_db)
+) -> Optional[User]:
+    """
+    优先用 Bearer token 识别登录用户；
+    否则用 X-Device-Id 找到或创建设备用户。
+    """
+    # 1. 尝试 Bearer token
+    if credentials:
+        user = _resolve_token(credentials.credentials, db)
+        if user:
+            return user
+
+    # 2. 尝试 device_id
+    if device_id:
+        user = db.query(User).filter(User.device_id == device_id).first()
+        if not user:
+            user = User(
+                username=f"device_{device_id[:8]}",
+                device_id=device_id,
+                is_device=True,
+                hashed_password=None
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+        return user
+
     return None

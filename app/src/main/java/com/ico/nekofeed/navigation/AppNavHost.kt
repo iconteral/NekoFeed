@@ -1,8 +1,11 @@
 package com.ico.nekofeed.navigation
 
 import android.net.Uri
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -25,6 +28,8 @@ import com.ico.nekofeed.ui.components.bottomNavItems
 import com.ico.nekofeed.ui.detail.FeedDetailScreen
 import com.ico.nekofeed.ui.feed.FeedScreen
 import com.ico.nekofeed.ui.feed.FeedViewModel
+import com.ico.nekofeed.ui.interaction.InteractionType
+import com.ico.nekofeed.ui.interaction.UserInteractionScreen
 import com.ico.nekofeed.ui.profile.ProfileScreen
 import com.ico.nekofeed.ui.search.SearchScreen
 import com.ico.nekofeed.ui.search.SearchViewModel
@@ -35,6 +40,7 @@ import com.ico.nekofeed.ui.stats.StatsScreen
 fun AppNavHost(
     authRepository: AuthRepository,
     userRepository: UserRepository,
+    restartApp: () -> Unit,
     navController: NavHostController = rememberNavController()
 ) {
     val feedViewModel: FeedViewModel = viewModel()
@@ -50,8 +56,10 @@ fun AppNavHost(
             LoginScreen(
                 viewModel = authViewModel,
                 onLoginSuccess = {
-                    navController.navigate("main") {
-                        popUpTo("login") { inclusive = true }
+                    if (!navController.popBackStack()) {
+                        navController.navigate("main") {
+                            popUpTo("login") { inclusive = true }
+                        }
                     }
                 },
                 onNavigateToRegister = {
@@ -65,8 +73,10 @@ fun AppNavHost(
             RegisterScreen(
                 viewModel = authViewModel,
                 onRegisterSuccess = {
-                    navController.navigate("main") {
-                        popUpTo("register") { inclusive = true }
+                    if (!navController.popBackStack()) {
+                        navController.navigate("main") {
+                            popUpTo("register") { inclusive = true }
+                        }
                     }
                 },
                 onNavigateToLogin = {
@@ -80,7 +90,9 @@ fun AppNavHost(
             MainScreen(
                 feedViewModel = feedViewModel,
                 authViewModel = authViewModel,
-                navController = navController
+                userRepository = userRepository,
+                navController = navController,
+                restartApp = restartApp
             )
         }
 
@@ -90,23 +102,38 @@ fun AppNavHost(
                 ProfileScreen(
                     authViewModel = authViewModel,
                     onLogout = {
-                        navController.navigate("main") {
-                            popUpTo(0) { inclusive = true }
-                        }
+                        restartApp()
                     },
                     onLogin = { navController.navigate("login") },
-                    onNavigateToLikes = { },
-                    onNavigateToCollections = { },
-                    onNavigateToHistory = { },
+                    onNavigateToLikes = {
+                        navController.navigate("main") {
+                            popUpTo("profile") { inclusive = true }
+                        }
+                    },
+                    onNavigateToCollections = {
+                        navController.navigate("main") {
+                            popUpTo("profile") { inclusive = true }
+                        }
+                    },
+                    onNavigateToHistory = {
+                        navController.navigate("main") {
+                            popUpTo("profile") { inclusive = true }
+                        }
+                    },
                     onBack = { navController.popBackStack() },
-                    onNavigateToAiSettings = { navController.navigate("ai_settings") }
+                    onNavigateToAiSettings = { navController.navigate("ai_settings") },
+                    loadStats = {
+                        userRepository.getUserStats().getOrNull()
+                    }
                 )
             } else {
                 LoginScreen(
                     viewModel = authViewModel,
                     onLoginSuccess = {
-                        navController.navigate("main") {
-                            popUpTo("login") { inclusive = true }
+                        if (!navController.popBackStack()) {
+                            navController.navigate("main") {
+                                popUpTo("login") { inclusive = true }
+                            }
                         }
                     },
                     onNavigateToRegister = {
@@ -119,7 +146,8 @@ fun AppNavHost(
         // AI Settings (outside main for direct navigation)
         composable("ai_settings") {
             AiSettingsScreen(
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onSettingsSaved = { restartApp() }
             )
         }
     }
@@ -129,14 +157,17 @@ fun AppNavHost(
 private fun MainScreen(
     feedViewModel: FeedViewModel,
     authViewModel: AuthViewModel,
-    navController: NavHostController
+    userRepository: UserRepository,
+    navController: NavHostController,
+    restartApp: () -> Unit
 ) {
     val nestedNavController = rememberNavController()
     val navBackStackEntry by nestedNavController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: "feed"
     val showBottomBar = currentRoute in bottomNavItems.map { it.route }
 
-    androidx.compose.material3.Scaffold(
+    Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
             if (showBottomBar) {
                 NekoFeedBottomNavigationBar(
@@ -186,6 +217,11 @@ private fun MainScreen(
                 val decodedId = Uri.decode(itemId)
                 val uiState by feedViewModel.uiState.collectAsState()
                 val item = remember(decodedId, uiState.items) { feedViewModel.getItemById(decodedId) }
+
+                LaunchedEffect(decodedId) {
+                    feedViewModel.recordClick(decodedId)
+                }
+
                 FeedDetailScreen(
                     item = item,
                     onBack = { nestedNavController.popBackStack() },
@@ -225,22 +261,57 @@ private fun MainScreen(
                 ProfileScreen(
                     authViewModel = authViewModel,
                     onLogout = {
-                        navController.navigate("main") {
-                            popUpTo(0) { inclusive = true }
-                        }
+                        restartApp()
                     },
                     onLogin = { navController.navigate("login") },
-                    onNavigateToLikes = { },
-                    onNavigateToCollections = { },
-                    onNavigateToHistory = { },
+                    onNavigateToLikes = { nestedNavController.navigate("likes") },
+                    onNavigateToCollections = { nestedNavController.navigate("collections") },
+                    onNavigateToHistory = { nestedNavController.navigate("history") },
                     onBack = { nestedNavController.popBackStack() },
-                    onNavigateToAiSettings = { nestedNavController.navigate("ai_settings") }
+                    onNavigateToAiSettings = { nestedNavController.navigate("ai_settings") },
+                    loadStats = {
+                        userRepository.getUserStats().getOrNull()
+                    }
+                )
+            }
+
+            composable("likes") {
+                UserInteractionScreen(
+                    type = InteractionType.LIKES,
+                    onBack = { nestedNavController.popBackStack() },
+                    onItemClick = { itemId ->
+                        val encodedId = Uri.encode(itemId)
+                        nestedNavController.navigate("detail/$encodedId")
+                    }
+                )
+            }
+
+            composable("collections") {
+                UserInteractionScreen(
+                    type = InteractionType.COLLECTIONS,
+                    onBack = { nestedNavController.popBackStack() },
+                    onItemClick = { itemId ->
+                        val encodedId = Uri.encode(itemId)
+                        nestedNavController.navigate("detail/$encodedId")
+                    }
+                )
+            }
+
+            composable("history") {
+                UserInteractionScreen(
+                    type = InteractionType.HISTORY,
+                    onBack = { nestedNavController.popBackStack() },
+                    onItemClick = { itemId ->
+                        val encodedId = Uri.encode(itemId)
+                        nestedNavController.navigate("detail/$encodedId")
+                    }
                 )
             }
 
             composable("ai_settings") {
                 AiSettingsScreen(
-                    onBack = { nestedNavController.popBackStack() }
+                    onBack = { nestedNavController.popBackStack() },
+                    onSettingsSaved = { restartApp() }
                 )
             }
         }

@@ -1,6 +1,10 @@
 package com.ico.nekofeed.ui.detail
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -8,11 +12,15 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -22,6 +30,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Bookmark
@@ -51,15 +60,22 @@ import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import android.content.pm.ActivityInfo
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
 import coil.compose.AsyncImage
 import com.ico.nekofeed.data.model.FeedItem
 import com.ico.nekofeed.ui.feed.components.FeedTagChip
+import com.ico.nekofeed.player.PlayerManager
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -143,14 +159,82 @@ fun FeedDetailScreen(
 
 @Composable
 private fun HeroMediaSection(item: FeedItem) {
+    val context = LocalContext.current
+    val playerManager = remember { PlayerManager.getInstance(context) }
+    var isFullscreen by remember { mutableStateOf(false) }
+
+    // 当进入详情页且是视频时，自动播放并解除静音
+    LaunchedEffect(item.id) {
+        if (item.isVideo) {
+            playerManager.play(item.mediaUrl)
+            playerManager.setMute(false)
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(300.dp)
-            .background(MaterialTheme.colorScheme.surfaceVariant),
+            .background(Color.Black),
         contentAlignment = Alignment.Center
     ) {
-        if (item.imageUrl != null) {
+        if (item.isVideo) {
+            if (isFullscreen) {
+                Dialog(
+                    onDismissRequest = { isFullscreen = false },
+                    properties = DialogProperties(
+                        usePlatformDefaultWidth = false,
+                        dismissOnBackPress = true
+                    )
+                ) {
+                    val activity = context as? androidx.activity.ComponentActivity
+                    androidx.compose.runtime.DisposableEffect(Unit) {
+                        val originalOrientation = activity?.requestedOrientation ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                        onDispose {
+                            activity?.requestedOrientation = originalOrientation
+                        }
+                    }
+                    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+                        AndroidView(
+                            factory = { ctx ->
+                                androidx.media3.ui.PlayerView(ctx).apply {
+                                    useController = true
+                                    player = playerManager.exoPlayer
+                                    setFullscreenButtonClickListener { fullscreen -> 
+                                        isFullscreen = fullscreen 
+                                    }
+                                }
+                            },
+                            update = { view ->
+                                if (view.player != playerManager.exoPlayer) {
+                                    view.player = playerManager.exoPlayer
+                                }
+                            },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                }
+            }
+
+            AndroidView(
+                factory = { ctx ->
+                    androidx.media3.ui.PlayerView(ctx).apply {
+                        useController = true // 详情页显示控制器
+                        player = playerManager.exoPlayer
+                        setFullscreenButtonClickListener { fullscreen -> 
+                            isFullscreen = fullscreen 
+                        }
+                    }
+                },
+                update = { view ->
+                    if (view.player != playerManager.exoPlayer) {
+                        view.player = playerManager.exoPlayer
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+        } else if (item.imageUrl != null) {
             AsyncImage(
                 model = item.imageUrl,
                 contentDescription = item.title,
@@ -174,7 +258,7 @@ private fun HeroMediaSection(item: FeedItem) {
             )
         } else {
             Text(
-                text = if (item.isVideo) "🎬" else "📷",
+                text = "📷",
                 style = MaterialTheme.typography.displayLarge
             )
         }
@@ -415,6 +499,7 @@ private fun ContentSection(item: FeedItem, isAiEnabled: Boolean) {
         // 来源信息
         if (item.sourceName != null || item.sourceUrl != null) {
             Spacer(modifier = Modifier.height(20.dp))
+            val context = LocalContext.current
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -434,11 +519,26 @@ private fun ContentSection(item: FeedItem, isAiEnabled: Boolean) {
                     }
                     if (item.sourceUrl != null) {
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = item.sourceUrl,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.clickable {
+                                openUrl(context, item.sourceUrl)
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.OpenInBrowser,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = item.sourceUrl,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                textDecoration = TextDecoration.Underline
+                            )
+                        }
                     }
                 }
             }
@@ -483,6 +583,7 @@ private fun DetailBottomBar(
     onCollectClick: ((String) -> Unit)? = null,
     onShareClick: ((String) -> Unit)? = null
 ) {
+    val context = LocalContext.current
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(0.dp),
@@ -496,6 +597,7 @@ private fun DetailBottomBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .navigationBarsPadding()
                 .padding(horizontal = 20.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
@@ -553,7 +655,15 @@ private fun DetailBottomBar(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     IconButton(
-                        onClick = { onShareClick?.invoke(item.id) },
+                        onClick = { 
+                            onShareClick?.invoke(item.id)
+                            com.ico.nekofeed.util.IntentUtils.shareContent(
+                                context = context,
+                                title = item.title,
+                                content = item.summary ?: "",
+                                url = item.sourceUrl
+                            )
+                        },
                         modifier = Modifier.size(24.dp)
                     ) {
                         Icon(
@@ -573,7 +683,9 @@ private fun DetailBottomBar(
 
             // CTA 按钮
             Button(
-                onClick = { /* 处理CTA点击 */ },
+                onClick = { 
+                    com.ico.nekofeed.util.IntentUtils.openUrl(context, item.sourceUrl)
+                },
                 modifier = Modifier
                     .weight(1f)
                     .padding(start = 16.dp),
@@ -601,6 +713,15 @@ private fun formatCount(count: Int): String {
 }
 
 private fun Float.format(digits: Int) = "%.${digits}f".format(this)
+
+private fun openUrl(context: Context, url: String) {
+    try {
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+        context.startActivity(intent)
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+}
 
 @Preview(showBackground = true)
 @Composable

@@ -1,7 +1,22 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h1>Upstream Feeds</h1>
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+    <h1>Upstream Feeds</h1>
+    <div style="display: flex; gap: 10px;">
+        <a href="/admin/feeds/export" class="btn" style="background-color: #8e44ad;">Export JSON</a>
+    </div>
+</div>
+
+{% if request.query_params.get('msg') == 'imported' %}
+<div class="card" style="background-color: #d5f5e3; border-left: 4px solid #2ecc71; margin-bottom: 1.5rem;">
+    <strong>Import complete:</strong>
+    Added {{ request.query_params.get('added', '0') }} |
+    Updated {{ request.query_params.get('updated', '0') }} |
+    Skipped {{ request.query_params.get('skipped', '0') }} |
+    Errors {{ request.query_params.get('errors', '0') }}
+</div>
+{% endif %}
 
 <div class="card">
     <h3>Add New Feed</h3>
@@ -16,6 +31,21 @@
         </select>
         <button type="submit" class="btn">Add Feed</button>
     </form>
+</div>
+
+<div class="card">
+    <h3>Import Feeds from JSON</h3>
+    <form action="/admin/feeds/import" method="post" enctype="multipart/form-data" style="flex-direction: row; align-items: center; max-width: 100%;">
+        <input type="file" name="file" accept=".json" required style="flex: 2;">
+        <label style="display: flex; align-items: center; gap: 4px; white-space: nowrap;">
+            <input type="checkbox" name="overwrite" value="true" style="width: auto;">
+            Overwrite existing
+        </label>
+        <button type="submit" class="btn" style="background-color: #8e44ad;">Import</button>
+    </form>
+    <div style="font-size: 0.8rem; color: #999; margin-top: 0.5rem;">
+        JSON format: <code>{"feeds": [{"name": "...", "url": "...", "category": "...", "enabled": true}, ...]}</code>
+    </div>
 </div>
 
 <div class="card">

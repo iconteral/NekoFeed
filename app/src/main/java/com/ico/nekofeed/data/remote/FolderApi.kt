@@ -21,7 +21,7 @@ interface FeedApi {
         @Query("item_type") itemType: String? = null,
         @Query("limit") limit: Int = 20,
         @Query("offset") offset: Int = 0,
-        @Query("base_url") baseUrl: String = "http://10.0.2.2:8000"
+        @Query("base_url") baseUrl: String? = null
     ): FeedResponse
 
     @POST("api/auth/register")

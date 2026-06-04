@@ -38,10 +38,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -52,9 +54,17 @@ import com.ico.nekofeed.ui.theme.ExpressiveTokens
 @Composable
 fun AiSettingsScreen(
     onBack: () -> Unit,
+    onSettingsSaved: (() -> Unit)? = null,
     viewModel: AiSettingsViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    LaunchedEffect(uiState.saveSuccess) {
+        if (uiState.saveSuccess) {
+            viewModel.resetSaveSuccess()
+            onSettingsSaved?.invoke()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -105,6 +115,31 @@ fun AiSettingsScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
+                        text = "服务端配置",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = uiState.serverEndpoint,
+                        onValueChange = { viewModel.updateServerEndpoint(it) },
+                        label = { Text("服务器地址") },
+                        placeholder = { Text("http://10.0.2.2:8000") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                )
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
                         text = "Endpoint 配置",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
@@ -121,7 +156,6 @@ fun AiSettingsScreen(
                     )
 
                     Spacer(modifier = Modifier.height(12.dp))
-
                     OutlinedTextField(
                         value = uiState.model,
                         onValueChange = { viewModel.updateModel(it) },
@@ -306,7 +340,10 @@ fun AiSettingsScreen(
             }
 
             Button(
-                onClick = { viewModel.saveConfig() },
+                onClick = {
+                    viewModel.saveConfig()
+                    onSettingsSaved?.invoke()
+                },
                 enabled = !uiState.isSaving,
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(ExpressiveTokens.SplitButtonOuterCorner)

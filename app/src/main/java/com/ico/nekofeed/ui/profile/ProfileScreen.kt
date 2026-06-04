@@ -39,6 +39,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -64,11 +65,20 @@ fun ProfileScreen(
     onNavigateToCollections: () -> Unit,
     onNavigateToHistory: () -> Unit,
     onBack: () -> Unit,
-    onNavigateToAiSettings: () -> Unit = {}
+    onNavigateToAiSettings: () -> Unit = {},
+    loadStats: (suspend () -> UserStats?)? = null
 ) {
     val authState by authViewModel.uiState.collectAsState()
     var userStats by remember { mutableStateOf<UserStats?>(null) }
     var isLoadingStats by remember { mutableStateOf(false) }
+
+    LaunchedEffect(authState.isLoggedIn) {
+        if (authState.isLoggedIn && loadStats != null) {
+            isLoadingStats = true
+            userStats = loadStats()
+            isLoadingStats = false
+        }
+    }
 
     ProfileScreenContent(
         authState = authState,
@@ -252,7 +262,7 @@ fun ProfileScreenContent(
                         Divider(modifier = Modifier.padding(horizontal = 16.dp))
                         MenuItem(
                             icon = Icons.Default.Settings,
-                            title = "AI 设置",
+                            title = "设置",
                             onClick = onNavigateToAiSettings
                         )
                     }

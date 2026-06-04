@@ -28,6 +28,8 @@ fun FeedItemCard(
     onShareClick: ((String) -> Unit)? = null,
     onTagClick: ((String) -> Unit)? = null,
     isAiEnabled: Boolean = true,
+    isPlaying: Boolean = false,
+    onMuteToggle: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var isPressed by remember { mutableStateOf(false) }
@@ -78,7 +80,9 @@ fun FeedItemCard(
                 onCollectClick = onCollectClick,
                 onShareClick = onShareClick,
                 onTagClick = onTagClick,
-                isAiEnabled = isAiEnabled
+                isAiEnabled = isAiEnabled,
+                isPlaying = isPlaying,
+                onMuteToggle = onMuteToggle
             )
             FeedCardType.PRODUCT -> ProductFeedCard(
                 item = item,

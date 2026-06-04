@@ -5,7 +5,7 @@ from datetime import datetime
 from app.database import get_db
 from app.models import User, FeedItem, UserLike, UserCollect, UserHistory
 from app.schemas import ItemInteraction, FeedItemResponse
-from app.auth import get_current_user, get_optional_user
+from app.auth import get_current_user, get_optional_user, get_or_create_device_user
 
 router = APIRouter(prefix="/api")
 
@@ -13,9 +13,12 @@ router = APIRouter(prefix="/api")
 @router.post("/items/{item_id}/like", response_model=ItemInteraction)
 def toggle_like(
     item_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_or_create_device_user),
     db: Session = Depends(get_db)
 ):
+    if not current_user:
+        raise HTTPException(status_code=400, detail="需要登录或提供设备 ID")
+    
     item = db.query(FeedItem).filter(FeedItem.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -53,9 +56,12 @@ def toggle_like(
 @router.post("/items/{item_id}/collect", response_model=ItemInteraction)
 def toggle_collect(
     item_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_or_create_device_user),
     db: Session = Depends(get_db)
 ):
+    if not current_user:
+        raise HTTPException(status_code=400, detail="需要登录或提供设备 ID")
+    
     item = db.query(FeedItem).filter(FeedItem.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -94,9 +100,12 @@ def toggle_collect(
 def record_history(
     item_id: str,
     duration: int = 0,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_or_create_device_user),
     db: Session = Depends(get_db)
 ):
+    if not current_user:
+        raise HTTPException(status_code=400, detail="需要登录或提供设备 ID")
+    
     item = db.query(FeedItem).filter(FeedItem.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")

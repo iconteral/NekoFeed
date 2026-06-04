@@ -3,6 +3,7 @@ package com.ico.nekofeed.data.repository
 import com.ico.nekofeed.data.local.FallbackFeedData
 import com.ico.nekofeed.data.model.FeedItem
 import com.ico.nekofeed.data.remote.FeedApi
+import com.ico.nekofeed.data.remote.RetrofitClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -21,7 +22,8 @@ class FeedRepository(private val feedApi: FeedApi) {
                     category = category,
                     itemType = itemType,
                     limit = limit,
-                    offset = offset
+                    offset = offset,
+                    baseUrl = RetrofitClient.getBaseUrl()
                 )
                 val items = response.items
                 if (offset == 0) {

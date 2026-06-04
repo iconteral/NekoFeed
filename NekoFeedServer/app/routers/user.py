@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Header
 from sqlalchemy.orm import Session
+from typing import Optional
 from app.database import get_db
 from app.models import User, UserLike, UserCollect, UserHistory
 from app.schemas import (
@@ -14,8 +15,56 @@ from app.auth import (
 router = APIRouter(prefix="/api/auth")
 
 
+def _merge_device_interactions(db: Session, device_id: str, real_user_id: int):
+    """将设备用户的 like/collect/history 迁移到真实用户"""
+    device_user = db.query(User).filter(User.device_id == device_id).first()
+    if not device_user or device_user.id == real_user_id:
+        return
+    
+    # 迁移 likes（跳过已存在的）
+    for like in db.query(UserLike).filter(UserLike.user_id == device_user.id).all():
+        exists = db.query(UserLike).filter(
+            UserLike.user_id == real_user_id,
+            UserLike.item_id == like.item_id
+        ).first()
+        if not exists:
+            like.user_id = real_user_id
+        else:
+            db.delete(like)
+    
+    # 迁移 collects
+    for collect in db.query(UserCollect).filter(UserCollect.user_id == device_user.id).all():
+        exists = db.query(UserCollect).filter(
+            UserCollect.user_id == real_user_id,
+            UserCollect.item_id == collect.item_id
+        ).first()
+        if not exists:
+            collect.user_id = real_user_id
+        else:
+            db.delete(collect)
+    
+    # 迁移 history
+    for history in db.query(UserHistory).filter(UserHistory.user_id == device_user.id).all():
+        exists = db.query(UserHistory).filter(
+            UserHistory.user_id == real_user_id,
+            UserHistory.item_id == history.item_id
+        ).first()
+        if not exists:
+            history.user_id = real_user_id
+        else:
+            db.delete(history)
+    
+    # 标记设备用户已绑定
+    device_user.linked_user_id = real_user_id
+    db.commit()
+
+
 @router.post("/register", response_model=Token)
-def register(user_data: UserCreate, db: Session = Depends(get_db)):
+def register(
+    user_data: UserCreate,
+    device_id: Optional[str] = Header(None, alias="X-Device-Id"),
+    db: Session = Depends(get_db)
+):
     existing = db.query(User).filter(User.username == user_data.username).first()
     if existing:
         raise HTTPException(
@@ -31,12 +80,20 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
 
+    # 迁移设备用户的互动到新注册用户
+    if device_id:
+        _merge_device_interactions(db, device_id, user.id)
+
     token = create_access_token({"sub": str(user.id)})
     return {"access_token": token, "token_type": "bearer"}
 
 
 @router.post("/login", response_model=Token)
-def login(user_data: UserLogin, db: Session = Depends(get_db)):
+def login(
+    user_data: UserLogin,
+    device_id: Optional[str] = Header(None, alias="X-Device-Id"),
+    db: Session = Depends(get_db)
+):
     user = db.query(User).filter(User.username == user_data.username).first()
     if not user or not verify_password(user_data.password, user.hashed_password):
         raise HTTPException(
@@ -48,6 +105,10 @@ def login(user_data: UserLogin, db: Session = Depends(get_db)):
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User is disabled"
         )
+
+    # 迁移设备用户的互动到登录用户
+    if device_id:
+        _merge_device_interactions(db, device_id, user.id)
 
     token = create_access_token({"sub": str(user.id)})
     return {"access_token": token, "token_type": "bearer"}

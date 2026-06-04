@@ -65,6 +65,13 @@ class FeedItemResponse(BaseModel):
     aiReason: Optional[str] = Field(None, alias="ai_reason")
     aiEnriched: bool = Field(False, alias="ai_enriched")
     
+    # 互动状态字段
+    isLiked: bool = Field(False, alias="is_liked")
+    isCollected: bool = Field(False, alias="is_collected")
+    likeCount: int = Field(0, alias="like_count")
+    collectCount: int = Field(0, alias="collect_count")
+    shareCount: int = Field(0, alias="share_count")
+    
     class Config:
         populate_by_name = True
         from_attributes = True

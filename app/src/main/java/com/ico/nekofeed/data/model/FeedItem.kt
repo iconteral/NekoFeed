@@ -49,25 +49,25 @@ data class FeedItem(
     @SerializedName("is_sponsored")
     val isSponsored: Boolean = false,
 
-    // 互动状态
+    // 互动状态 — 来自服务端
     @SerializedName("is_liked")
-    var isLiked: Boolean = false,
+    val isLiked: Boolean = false,
     @SerializedName("is_collected")
-    var isCollected: Boolean = false,
+    val isCollected: Boolean = false,
     @SerializedName("like_count")
-    var likeCount: Int = 0,
+    val likeCount: Int = 0,
     @SerializedName("collect_count")
-    var collectCount: Int = 0,
+    val collectCount: Int = 0,
     @SerializedName("share_count")
-    var shareCount: Int = 0,
+    val shareCount: Int = 0,
 
     // 统计状态
     @SerializedName("exposure_count")
-    var exposureCount: Int = 0,
+    val exposureCount: Int = 0,
     @SerializedName("click_count")
-    var clickCount: Int = 0,
+    val clickCount: Int = 0,
     @SerializedName("play_count")
-    var playCount: Int = 0,
+    val playCount: Int = 0,
 
     // 时间
     @SerializedName("published_at")

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Request, Form, HTTPException, UploadFile, File, BackgroundTasks
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
@@ -94,16 +94,96 @@ def toggle_feed(feed_id: int, db: Session = Depends(get_db)):
         db.commit()
     return RedirectResponse(url="/admin/feeds", status_code=303)
 
+
+@router.get("/feeds/export")
+def export_feeds(db: Session = Depends(get_db)):
+    feeds = db.query(UpstreamFeed).all()
+    data = []
+    for f in feeds:
+        data.append({
+            "name": f.name,
+            "url": f.url,
+            "category": f.category,
+            "enabled": f.enabled,
+        })
+    return JSONResponse(
+        content={"version": 1, "feeds": data},
+        headers={"Content-Disposition": "attachment; filename=feeds_export.json"}
+    )
+
+
+@router.post("/feeds/import")
+def import_feeds(
+    file: UploadFile = File(...),
+    overwrite: bool = Form(False),
+    db: Session = Depends(get_db)
+):
+    import json
+    try:
+        content = file.file.read()
+        payload = json.loads(content)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON file")
+
+    feeds = payload.get("feeds") if isinstance(payload, dict) else payload
+    if not isinstance(feeds, list):
+        raise HTTPException(status_code=400, detail="JSON must contain a 'feeds' array")
+
+    added = 0
+    skipped = 0
+    updated = 0
+    errors = []
+
+    for i, entry in enumerate(feeds):
+        name = entry.get("name", "").strip()
+        url = entry.get("url", "").strip()
+        category = entry.get("category", "tech").strip()
+        enabled = entry.get("enabled", True)
+
+        if not name or not url:
+            errors.append(f"Row {i+1}: missing name or url")
+            continue
+
+        existing = db.query(UpstreamFeed).filter(UpstreamFeed.url == url).first()
+        if existing:
+            if overwrite:
+                existing.name = name
+                existing.category = category
+                existing.enabled = enabled
+                updated += 1
+            else:
+                skipped += 1
+            continue
+
+        feed = UpstreamFeed(name=name, url=url, category=category, enabled=enabled)
+        db.add(feed)
+        added += 1
+
+    db.commit()
+    return RedirectResponse(
+        url=f"/admin/feeds?msg=imported&added={added}&skipped={skipped}&updated={updated}&errors={len(errors)}",
+        status_code=303
+    )
+
 @router.get("/items", response_class=HTMLResponse)
-def admin_items(request: Request, category: str = None, item_type: str = None, db: Session = Depends(get_db)):
+def admin_items(request: Request, category: str = None, item_type: str = None, page: int = 1, db: Session = Depends(get_db)):
+    per_page = 20
     query = db.query(FeedItem)
     if category:
         query = query.filter(FeedItem.category == category)
     if item_type:
         query = query.filter(FeedItem.item_type == item_type)
-    
-    items = query.order_by(FeedItem.published_at.desc()).limit(100).all()
-    return templates.TemplateResponse(request=request, name="items.html", context={"request": request, "items": items, "category": category, "item_type": item_type})
+
+    total = query.count()
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    page = max(1, min(page, total_pages))
+    offset = (page - 1) * per_page
+
+    items = query.order_by(FeedItem.published_at.desc()).offset(offset).limit(per_page).all()
+    return templates.TemplateResponse(request=request, name="items.html", context={
+        "request": request, "items": items, "category": category, "item_type": item_type,
+        "page": page, "total_pages": total_pages, "total": total, "per_page": per_page
+    })
 
 @router.get("/items/new", response_class=HTMLResponse)
 def new_custom_item_form(request: Request):
@@ -177,6 +257,81 @@ def item_detail(request: Request, item_id: str, db: Session = Depends(get_db)):
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
     return templates.TemplateResponse(request=request, name="item_detail.html", context={"request": request, "item": item})
+
+@router.get("/items/{item_id}/edit", response_class=HTMLResponse)
+def edit_item_form(request: Request, item_id: str, db: Session = Depends(get_db)):
+    item = db.query(FeedItem).filter(FeedItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return templates.TemplateResponse(request=request, name="item_edit.html", context={"request": request, "item": item})
+
+@router.post("/items/{item_id}/edit")
+def update_item(
+    item_id: str,
+    title: str = Form(...),
+    summary: str = Form(""),
+    content: str = Form(""),
+    source_name: str = Form(""),
+    source_url: str = Form(""),
+    category: str = Form("tech"),
+    item_type: str = Form("article"),
+    card_type: str = Form("large_image"),
+    image_url: str = Form(""),
+    media_url: str = Form(""),
+    image_file: UploadFile | None = File(None),
+    media_file: UploadFile | None = File(None),
+    tags: str = Form(""),
+    brand: str = Form(""),
+    cta_text: str = Form(""),
+    price_text: str = Form(""),
+    is_sponsored: bool = Form(False),
+    ai_summary: str = Form(""),
+    ai_tags: str = Form(""),
+    ai_reason: str = Form(""),
+    ai_enriched: bool = Form(False),
+    db: Session = Depends(get_db)
+):
+    item = db.query(FeedItem).filter(FeedItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    item.title = title
+    item.summary = summary or None
+    item.content = content or None
+    item.source_name = source_name or None
+    item.source_url = source_url or None
+    item.category = category
+    item.item_type = item_type
+    item.card_type = card_type
+    item.tags = tags or None
+    item.brand = brand or None
+    item.cta_text = cta_text or None
+    item.price_text = price_text or None
+    item.is_sponsored = is_sponsored
+    item.ai_summary = ai_summary or None
+    item.ai_tags = ai_tags or None
+    item.ai_reason = ai_reason or None
+    item.ai_enriched = ai_enriched
+
+    local_image_path = _save_upload_file(image_file, MEDIA_IMAGE_DIR, "/media/images")
+    local_media_path = _save_upload_file(media_file, MEDIA_VIDEO_DIR, "/media/videos")
+
+    if local_image_path:
+        item.local_image_path = local_image_path
+        item.image_url = None
+    elif image_url.strip():
+        item.image_url = image_url.strip()
+        item.local_image_path = None
+
+    if local_media_path:
+        item.local_media_path = local_media_path
+        item.media_url = None
+    elif media_url.strip():
+        item.media_url = media_url.strip()
+        item.local_media_path = None
+
+    db.commit()
+    return RedirectResponse(url=f"/admin/items/{item_id}", status_code=303)
 
 @router.post("/items/{item_id}/delete")
 def delete_item(item_id: str, db: Session = Depends(get_db)):

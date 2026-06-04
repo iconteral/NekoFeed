@@ -48,7 +48,6 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -86,7 +85,10 @@ fun FeedScreen(
 
     FeedScreenContent(
         uiState = uiState,
-        onItemClick = onItemClick,
+        onItemClick = { itemId ->
+            viewModel.recordClick(itemId)
+            onItemClick(itemId)
+        },
         onSearchClick = onSearchClick,
         onStatsClick = onStatsClick,
         onAiSettingsClick = onAiSettingsClick,
@@ -98,7 +100,9 @@ fun FeedScreen(
         onCollectClick = viewModel::toggleCollect,
         onShareClick = viewModel::toggleShare,
         onTagClick = viewModel::filterByTag,
-        onAiRequest = viewModel::requestAiAnalysis
+        onAiRequest = viewModel::requestAiAnalysis,
+        onExposure = viewModel::recordExposure,
+        onPlayingItemChange = viewModel::setPlayingItemId
     )
 }
 
@@ -118,7 +122,9 @@ fun FeedScreenContent(
     onCollectClick: (String) -> Unit,
     onShareClick: (String) -> Unit,
     onTagClick: (String) -> Unit,
-    onAiRequest: (FeedItem) -> Unit
+    onAiRequest: (FeedItem) -> Unit,
+    onExposure: (String) -> Unit = {},
+    onPlayingItemChange: (String?) -> Unit
 ) {
     val listState = rememberLazyListState()
     var fabExpanded by remember { mutableStateOf(false) }
@@ -214,7 +220,10 @@ fun FeedScreenContent(
                         onCollectClick = onCollectClick,
                         onShareClick = onShareClick,
                         onTagClick = onTagClick,
-                        onAiRequest = onAiRequest
+                        onAiRequest = onAiRequest,
+                        onExposure = onExposure,
+                        onPlayingItemChange = onPlayingItemChange,
+                        playingItemId = uiState.playingItemId
                     )
                 }
             }
@@ -246,7 +255,7 @@ fun FeedScreenContent(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
-                            text = "AI 设置",
+                            text = "设置",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -402,8 +411,12 @@ private fun FeedContent(
     onCollectClick: (String) -> Unit,
     onShareClick: (String) -> Unit,
     onTagClick: (String) -> Unit,
-    onAiRequest: (FeedItem) -> Unit
+    onAiRequest: (FeedItem) -> Unit,
+    onExposure: (String) -> Unit,
+    onPlayingItemChange: (String?) -> Unit,
+    playingItemId: String?
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     // Infinite scroll detection: trigger loadMore when scrolled near the bottom
     LaunchedEffect(listState) {
         snapshotFlow {
@@ -418,6 +431,60 @@ private fun FeedContent(
             }
             .collect {
                 onLoadMore()
+            }
+    }
+
+    // Auto-play detection: find the item closest to center
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            val layoutInfo = listState.layoutInfo
+            val center = (layoutInfo.viewportEndOffset + layoutInfo.viewportStartOffset) / 2
+            
+            var closestItem: androidx.compose.foundation.lazy.LazyListItemInfo? = null
+            var minDistance = Int.MAX_VALUE
+            
+            for (itemInfo in layoutInfo.visibleItemsInfo) {
+                val itemCenter = itemInfo.offset + itemInfo.size / 2
+                val distance = kotlin.math.abs(itemCenter - center)
+                if (distance < minDistance) {
+                    minDistance = distance
+                    closestItem = itemInfo
+                }
+            }
+            closestItem?.key as? String
+        }
+        .distinctUntilChanged()
+        .collect { itemId ->
+            onPlayingItemChange(itemId)
+        }
+    }
+
+    // Lifecycle observer to pause video when app goes to background
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    LaunchedEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_PAUSE) {
+                onPlayingItemChange(null)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        kotlinx.coroutines.suspendCancellableCoroutine<Unit> { continuation ->
+            continuation.invokeOnCancellation {
+                lifecycleOwner.lifecycle.removeObserver(observer)
+            }
+        }
+    }
+
+    // Exposure tracking: detect visible items
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            listState.layoutInfo.visibleItemsInfo.mapNotNull { it.key as? String }
+        }
+            .distinctUntilChanged()
+            .collect { visibleIds ->
+                visibleIds.forEach { id ->
+                    onExposure(id)
+                }
             }
     }
 
@@ -464,9 +531,19 @@ private fun FeedContent(
                 onClick = { onItemClick(item.id) },
                 onLikeClick = onLikeClick,
                 onCollectClick = onCollectClick,
-                onShareClick = onShareClick,
+                onShareClick = {
+                    onShareClick(it)
+                    com.ico.nekofeed.util.IntentUtils.shareContent(
+                        context = context,
+                        title = item.title,
+                        content = item.summary ?: "",
+                        url = item.sourceUrl
+                    )
+                },
                 onTagClick = onTagClick,
-                isAiEnabled = isAiEnabled
+                isAiEnabled = isAiEnabled,
+                isPlaying = item.id == playingItemId,
+                onMuteToggle = { /* handled internally or by global state if needed */ }
             )
         }
 
@@ -581,7 +658,9 @@ fun FeedScreenPreview() {
             onCollectClick = {},
             onShareClick = {},
             onTagClick = {},
-            onAiRequest = {}
+            onAiRequest = {},
+            onExposure = {},
+            onPlayingItemChange = {}
         )
     }
 }

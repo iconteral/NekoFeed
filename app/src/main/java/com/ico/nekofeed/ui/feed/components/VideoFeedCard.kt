@@ -22,13 +22,22 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.Bookmark
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -40,6 +49,7 @@ import com.ico.nekofeed.data.model.FeedItem
 import androidx.compose.animation.Crossfade
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LinearWavyProgressIndicator
+import com.ico.nekofeed.player.PlayerManager
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -50,16 +60,71 @@ fun VideoFeedCard(
     onShareClick: ((String) -> Unit)? = null,
     onTagClick: ((String) -> Unit)? = null,
     isAiEnabled: Boolean = true,
+    isPlaying: Boolean = false,
+    onMuteToggle: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val playerManager = remember { PlayerManager.getInstance(context) }
+    var isMuted by remember { mutableStateOf(playerManager.isMuted) }
+
+    LaunchedEffect(isPlaying) {
+        if (isPlaying) {
+            playerManager.play(item.mediaUrl)
+            // Update mute state to match manager
+            isMuted = playerManager.isMuted
+        }
+    }
+
     Column(modifier = modifier) {
         // 视频封面区域
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(260.dp)
+                .background(Color.Black)
         ) {
-            if (item.imageUrl != null) {
+            if (isPlaying) {
+                AndroidView(
+                    factory = { ctx ->
+                        androidx.media3.ui.PlayerView(ctx).apply {
+                            useController = false
+                            player = playerManager.exoPlayer
+                            resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                        }
+                    },
+                    update = { view ->
+                        if (view.player != playerManager.exoPlayer) {
+                            view.player = playerManager.exoPlayer
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().height(260.dp)
+                )
+
+                // 静音控制按钮
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(12.dp)
+                        .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                ) {
+                    IconButton(
+                        onClick = {
+                            playerManager.toggleMute()
+                            isMuted = playerManager.isMuted
+                            onMuteToggle()
+                        },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isMuted) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp,
+                            contentDescription = "静音",
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            } else if (item.imageUrl != null) {
                 AsyncImage(
                     model = item.imageUrl,
                     contentDescription = item.title,

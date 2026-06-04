@@ -597,7 +597,16 @@
                     lastErrorAlert.style.display = 'none';
                 }
 
-                logBox.textContent = `[Worker Log] Processed ${processed}/${total} items (Success: ${success}, Failed: ${failed})...`;
+                const currentItem = status.current_item;
+                const streamingContent = status.streaming_content || "";
+                let logText = `[Worker Log] Processed ${processed}/${total} items (Success: ${success}, Failed: ${failed})...`;
+                if (currentItem) {
+                    logText += `\nEnriching: [${currentItem.title}]`;
+                    if (streamingContent) {
+                        logText += `\n${streamingContent}`;
+                    }
+                }
+                logBox.textContent = logText;
                 logBox.scrollTop = logBox.scrollHeight;
             } else {
                 // Not running

@@ -1,5 +1,6 @@
 package com.ico.nekofeed.data.remote
 
+import com.ico.nekofeed.data.local.TokenManager
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -7,16 +8,26 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
-    private const val BASE_URL = "http://10.0.2.2:8000/"
+    private var baseUrl: String = TokenManager.DEFAULT_SERVER_BASE_URL
 
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY
     }
 
     private var tokenProvider: (() -> String?)? = null
+    private var deviceIdProvider: (() -> String?)? = null
+    private var onUnauthorized: (() -> Unit)? = null
 
     fun setTokenProvider(provider: () -> String?) {
         tokenProvider = provider
+    }
+
+    fun setDeviceIdProvider(provider: () -> String?) {
+        deviceIdProvider = provider
+    }
+
+    fun setUnauthorizedHandler(handler: () -> Unit) {
+        onUnauthorized = handler
     }
 
     fun hasToken(): Boolean {
@@ -28,15 +39,25 @@ object RetrofitClient {
             .addInterceptor(loggingInterceptor)
             .addInterceptor { chain ->
                 val original = chain.request()
-                val token = tokenProvider?.invoke()
-                val newRequest = if (token != null) {
-                    original.newBuilder()
-                        .header("Authorization", "Bearer $token")
-                        .build()
-                } else {
-                    original
+                val builder = original.newBuilder()
+
+                // 添加 Bearer token（如果有）
+                tokenProvider?.invoke()?.let {
+                    builder.header("Authorization", "Bearer $it")
                 }
-                chain.proceed(newRequest)
+                // 始终添加 device_id
+                deviceIdProvider?.invoke()?.let {
+                    builder.header("X-Device-Id", it)
+                }
+
+                val response = chain.proceed(builder.build())
+
+                // 遇到 401 时清除登录状态
+                if (response.code == 401) {
+                    onUnauthorized?.invoke()
+                }
+
+                response
             }
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)
@@ -44,13 +65,29 @@ object RetrofitClient {
             .build()
     }
 
-    private val retrofit by lazy {
-        Retrofit.Builder()
-            .baseUrl(BASE_URL)
+    @Volatile
+    private var retrofit: Retrofit = buildRetrofit(baseUrl)
+
+    @Volatile
+    var feedApi: FeedApi = retrofit.create(FeedApi::class.java)
+        private set
+
+    private fun buildRetrofit(url: String): Retrofit {
+        val normalizedUrl = if (url.endsWith("/")) url else "$url/"
+        return Retrofit.Builder()
+            .baseUrl(normalizedUrl)
             .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
     }
 
-    val feedApi: FeedApi by lazy { retrofit.create(FeedApi::class.java) }
+    fun updateBaseUrl(url: String) {
+        if (url.isNotBlank() && url != baseUrl) {
+            baseUrl = url
+            retrofit = buildRetrofit(url)
+            feedApi = retrofit.create(FeedApi::class.java)
+        }
+    }
+
+    fun getBaseUrl(): String = baseUrl
 }

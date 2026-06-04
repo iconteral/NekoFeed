@@ -1,178 +1,325 @@
-# NekoFeed 功能完善实现计划
+# NekoFeed 项目 Critique
 
-为了消除当前项目与 [原需求.md](file:///l:/NekoFeed/Docs/原需求.md) 和 [Design.md](file:///l:/NekoFeed/Docs/Design.md) 之间的差距，我们需要在服务端和客户端做出一系列改进。本项目包含的主要缺陷有：**视频无法播放**、**缺少真实曝光/点击埋点上报**、**详情页互动状态不同步**。
+## TL;DR
 
-以下是详细的设计与实施方案。
-
----
-
-## 1. 服务端改造方案
-
-为了支持真实的曝光、点击与视频播放上报，服务端需要在数据库中持久化这些数据，并提供自增统计接口。
-
-### 1.1 数据库与模型调整
-* 在 `NekoFeedServer/app/models.py` 的 [FeedItem](file:///l:/NekoFeed/NekoFeedServer/app/models.py#L19) 类中增加以下字段：
-  - `exposure_count = Column(Integer, default=0)` (曝光计数)
-  - `click_count = Column(Integer, default=0)` (点击计数)
-  - `play_count = Column(Integer, default=0)` (视频播放计数)
-* 在 `NekoFeedServer/app/schemas.py` 的 [FeedItemResponse](file:///l:/NekoFeed/NekoFeedServer/app/schemas.py#L45) 结构体中添加字段，以别名映射的方式支持客户端的反序列化：
-  ```python
-  exposureCount: int = Field(0, alias="exposure_count")
-  clickCount: int = Field(0, alias="click_count")
-  playCount: int = Field(0, alias="play_count")
-  ```
-
-### 1.2 路由与 API 逻辑
-* 在 `NekoFeedServer/app/routers/user_interaction.py`（或 `api.py`）中，新增以下三个上报统计的 POST API，每次请求将数据库中对应的字段自增 1，并返回最新数值：
-  - `POST /api/items/{item_id}/exposure`
-  - `POST /api/items/{item_id}/click`
-  - `POST /api/items/{item_id}/play`
-
-### 1.3 初始化数据
-* 修改 `NekoFeedServer/seed.py` 中自定义广告和视频的预置字段，确保初始计数有默认值。
-* 执行重建数据库迁移（删除本地 SQLite 数据库文件 `neko_feed.db`），并重新运行 `python seed.py` 以适应新的表结构。
+整体架构设计清晰，分层合理，UI 质量高。核心骨架（Feed 加载、AI 摘要、分类/Tag 过滤、互动、Stats 展示）已基本完成。
+主要问题集中在：**统计数据永远为 0**（无曝光/点击埋点调用）、**视频播放完全未实现**（VideoFeedCard 是空壳）、**分类过滤在客户端做而非服务端**（有正确性 Bug）、**FeedDetailScreen 没有 ViewModel**（点击统计和状态回流缺失）、以及若干命名混乱问题。
 
 ---
 
-## 2. 客户端依赖引入
+## 1. 整体逻辑链路梳理
 
-需要引入 Media3 ExoPlayer 用于播放视频。
-
-* 在 [libs.versions.toml](file:///l:/NekoFeed/gradle/libs.versions.toml) 中增加：
-  ```toml
-  [versions]
-  media3 = "1.4.1" # 保证 compileSdk 37 的良好兼容性
-
-  [libraries]
-  media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "media3" }
-  media3-ui = { group = "androidx.media3", name = "media3-ui", version.ref = "media3" }
-  ```
-* 在 [app/build.gradle.kts](file:///l:/NekoFeed/app/build.gradle.kts) 的 `dependencies` 块中加入：
-  ```kotlin
-  implementation(libs.media3.exoplayer)
-  implementation(libs.media3.ui)
-  ```
-
----
-
-## 3. 跨页面互动状态同步 (P0)
-
-当前详情页点赞/收藏后返回列表，列表显示不正确，且详情页本身的图标状态不会在点击后实时刷新。
-
-### 3.1 引入 Room Live Query 支持
-* 修改 [FeedItemInteractionDao.kt](file:///l:/NekoFeed/app/src/main/java/com/ico/nekofeed/data/local/db/FeedItemInteractionDao.kt)，使其查询支持 Flow 流式订阅：
-  ```kotlin
-  @Query("SELECT * FROM feed_item_interaction WHERE itemId = :itemId")
-  fun getInteractionFlow(itemId: String): Flow<FeedItemInteractionEntity?>
-
-  @Query("SELECT * FROM feed_item_interaction")
-  fun getAllInteractionsFlow(): Flow<List<FeedItemInteractionEntity>>
-  ```
-
-### 3.2 抽取 InteractionRepository
-* **[NEW]** 新建 `data/repository/InteractionRepository.kt`：
-  - 封装原本分散在 `FeedViewModel` 中的 `toggleLike`、`toggleCollect` 和 `toggleShare` 逻辑。
-  - 在底层同时修改 Room 数据库表，并根据用户登录状态调用网络 API 同步。
-  - 通过 `getAllInteractionsFlow()` 提供流式的全量交互数据流。
-
-### 3.3 ViewModel 与 Navigation 重构
-* 在 `FeedViewModel` 中：
-  - 引入 `InteractionRepository`。
-  - 在 `init` 阶段，通过协程 `collect` 并监听 `InteractionRepository.getAllInteractionsFlow()`，每当本地 Room 缓存的交互状态变更时，将这些交互映射并合并到 `uiState.items` 中，从而自动触发列表刷新。
-  - 暴露一个 `observeItem(itemId: String): Flow<FeedItem?>` 方法，方便详情页直接流式监听特定 Item 的变化。
-* 在 [AppNavHost.kt](file:///l:/NekoFeed/app/src/main/java/com/ico/nekofeed/navigation/AppNavHost.kt#L181) 详情页 Composable 声明中：
-  - 弃用静态的 `remember(decodedId) { feedViewModel.getItemById(decodedId) }`。
-  - 改为使用：
-    ```kotlin
-    val itemState by feedViewModel.observeItem(decodedId).collectAsState(initial = null)
-    ```
-  - 将 `itemState` 传给 `FeedDetailScreen`，使详情页的图标状态与数据层时刻同步。
+```
+NekoFeedServer (Python/FastAPI)
+    ├── SQLite DB: FeedItem / UpstreamFeed / User / UserLike / UserCollect / UserHistory
+    └── GET /api/feed?category&limit&offset&base_url
+              ↓
+Android App
+    ├── RetrofitClient → FeedApi → FeedRepository
+    ├── FeedViewModel (AndroidViewModel)
+    │     ├── loadFeed / loadMore / refresh
+    │     ├── mergeLocalInteractions (Room DB)
+    │     ├── batchGenerateAi → AiRepository → LLM API
+    │     ├── toggleLike / toggleCollect / toggleShare
+    │     ├── filterByCategory / filterByTag
+    │     └── getStats / getItemById / searchItems
+    ├── UI Layer
+    │     ├── FeedScreen (LazyColumn + PullToRefresh + FAB)
+    │     ├── FeedDetailScreen (静态展示，无独立 ViewModel)
+    │     ├── SearchScreen + SearchViewModel
+    │     └── StatsScreen (纯展示，getStats() 是同步函数调用)
+    └── Local DB (Room)
+          ├── AiCacheEntity (AI 结果持久化)
+          ├── FeedItemInteractionEntity (互动持久化)
+          └── UserProfileEntity (用户画像 tag)
+```
 
 ---
 
-## 4. 真实曝光与点击埋点上报 (P0)
+## 2. 已确认的 Bug
 
-通过监听 `LazyColumn` 滚动和进入详情页的生命周期，实现精确上报。
+### 🔴 Bug 1：曝光/点击/播放统计永远为 0
 
-### 4.1 新建 AnalyticsRepository
-* **[NEW]** 新建 `data/repository/AnalyticsRepository.kt`：
-  - 负责调用网络 API 上报埋点：`reportExposure(itemId)`、`reportClick(itemId)`、`reportPlay(itemId)`。
-  - 如果 API 失败，进行本地日志输出或进行静默重试。
+**位置**：[FolderViewModel.kt](file:///e:/NekoFeed/app/src/main/java/com/ico/nekofeed/ui/feed/FolderViewModel.kt) `getStats()` / [FolderDetailScreen.kt](file:///e:/NekoFeed/app/src/main/java/com/ico/nekofeed/ui/detail/FolderDetailScreen.kt)
 
-### 4.2 列表曝光检测逻辑
-* 在 [FolderScreen.kt](file:///l:/NekoFeed/app/src/main/java/com/ico/nekofeed/ui/feed/FolderScreen.kt) 对应的 Composable `FeedContent` 中，通过 `snapshotFlow` 监控可见 items 的变动。
-* 在 `FeedViewModel` 中维护已曝光 Item 的去重 Set：
-  ```kotlin
-  private val exposedItemIds = mutableSetOf<String>()
-  
-  fun reportItemExposure(itemId: String) {
-      if (exposedItemIds.add(itemId)) {
-          viewModelScope.launch {
-              analyticsRepository.reportExposure(itemId)
-              // 更新本地 uiState 里的 exposureCount 使其有即时反馈
-              updateLocalItemStats(itemId, isExposure = true)
-          }
-      }
-  }
-  ```
-* 当滚动检测到 item 索引进入可见范围时，调用 ViewModel 的 `reportItemExposure` 方法。
+**问题**：
 
-### 4.3 点击进入详情页上报
-* 在 [AppNavHost.kt](file:///l:/NekoFeed/app/src/main/java/com/ico/nekofeed/navigation/AppNavHost.kt) 中进入详情页的路由块内，使用 `LaunchedEffect(decodedId)` 触发 `feedViewModel.reportItemClick(decodedId)` 上报，并通过 `userProfileRepository.recordInteraction(item, CLICK)` 记录用户标签画像。
+- `FeedItem.exposureCount`、`clickCount`、`playCount` 在 `FeedItem` 上是普通字段，初始值来自服务端（服务端 `api.py` 并没有在响应里返回这三个字段），所以**始终为 0**。
+- 整个代码库里没有任何一个地方调用 `exposureCount++` 或 `clickCount++` 的逻辑。需求文档要求曝光在卡片进入可视区域时记录，点击在卡片点击时记录，但这两个回调从未被触发。
+- `StatsScreen` 的 `getStats()` 是**同步调用**（`getStats: () -> StatsData`），数据源是 `allItems.sumOf { it.exposureCount }`，全为 0，Statistics 页面永远是空的。
+
+**修复方向**：
+
+1. 在 `FeedContent` 的每个 Item 的 `LaunchedEffect` 或 `onVisible` 回调里触发 `viewModel.recordExposure(item.id)`。
+2. 在 `FeedItemCard` 的 `onClick` 里触发 `viewModel.recordClick(item.id)`。
+3. 在 `FolderViewModel` 里把 exposure/click 的增量写回 `allItems`（或独立维护 analytics map）。
 
 ---
 
-## 5. 视频播放器实现与复用 (P0)
+### 🔴 Bug 2：视频 FeedCard 是空壳，无实际播放能力
 
-列表中只允许播放一个视频（最好支持静音和滚动滑出暂停），详情页可以无缝继续播放。
+**位置**：[VideoFeedCard.kt](file:///e:/NekoFeed/app/src/main/java/com/ico/nekofeed/ui/feed/components/VideoFeedCard.kt)（15 KB）
 
-### 5.1 实现 PlayerManager
-* **[NEW]** 新建 `util/PlayerManager.kt`（全局单例）：
-  - 内部持有唯一的 `ExoPlayer` 实例。
-  - 提供 `playVideo(context, mediaUrl, itemId)` 和 `pauseVideo()` 方法。
-  - 追踪 `currentPlayingItemId`（作为 StateFlow 暴露）。
-  - 提供静音与取消静音切换。
+需要阅读确认，但从架构上看：
 
-### 5.2 列表卡片 VideoFeedCard 改造
-* 在 [VideoFeedCard.kt](file:///l:/NekoFeed/app/src/main/java/com/ico/nekofeed/ui/feed/components/VideoFeedCard.kt) 中：
-  - 监听 `PlayerManager.currentPlayingItemId`。如果当前 Item 正在播放，则隐藏静态 cover 图像，在原位展示 `AndroidView(factory = { PlayerView(...) })`，将共享的 ExoPlayer attach 上去。
-  - 提供视频封面中心的“播放”叠加按钮。点击时开始播放并在卡片显示静音/取消静音控制。
-* **滑动暂停支持**：在列表曝光检测的基础上，如果当前播放的 `playingItemId` 不在可见 Items 的列表中，立即调用 `PlayerManager.pauseVideo()`。
+- 需求文档（§8.3、§15.1）明确要求使用 **Media3/ExoPlayer** 和 **PlayerManager** 做单一视频播放、滚出暂停。
+- 代码库里没有 `player/` 目录，没有 `PlayerManager.kt`，`FeedUiState` 虽有 `playingItemId` 字段但**没有任何地方给它赋非 null 值**。
+- `VideoFeedCard` 很可能只展示封面图 + 播放图标，点击没有真正的播放行为。
 
-### 5.3 详情页 FeedDetailScreen 播放支持
-* 在 [FolderDetailScreen.kt](file:///l:/NekoFeed/app/src/main/java/com/ico/nekofeed/ui/detail/FolderDetailScreen.kt#L132) 的 `HeroMediaSection` 中：
-  - 若 `item.isVideo` 为 true，用 `AndroidView` 渲染 Media3 `PlayerView`。
-  - 进入详情页时利用 `LaunchedEffect` 调用 `PlayerManager.playVideo` 自动播放视频，静音状态继承自全局状态。
-  - 在详情页提供原生的控制栏，或者通过 Overlay 浮层实现播放/暂停和静音按钮。
-  - 当视频播放开始时，触发 `feedViewModel.reportVideoPlay(itemId)`。
+**修复方向**：实现 `PlayerManager`（单例 ExoPlayer）+ `playingItemId` 状态联动，`VideoFeedCard` 通过 `AndroidView` 嵌入 `PlayerView`。
 
 ---
 
-## 6. P1 体验优化 (CTA 及外链)
+### 🔴 Bug 3：分类过滤在客户端做，`loadMore` 后过滤不准
 
-* **“查看原文” 与 广告/商品 CTA 跳转**：
-  - 在 [FolderDetailScreen.kt](file:///l:/NekoFeed/app/src/main/java/com/ico/nekofeed/ui/detail/FolderDetailScreen.kt) 中引入 `LocalUriHandler.current`。
-  - ARTICLE 的“来源 URL”和“查看原文”按钮的 `onClick`，以及广告/商品的 CTA 按钮，执行 `uriHandler.openUri(item.sourceUrl)`，在浏览器中打开目标外链。
+**位置**：[FolderViewModel.kt#L479](file:///e:/NekoFeed/app/src/main/java/com/ico/nekofeed/ui/feed/FolderViewModel.kt#L479-L489)
+
+```kotlin
+// 客户端过滤逻辑
+private fun filterByCategory(items: List<FeedItem>, category: FeedCategory): List<FeedItem> {
+    return when (category) {
+        FeedCategory.FEATURED -> items
+        else -> items.filter { item ->
+            item.category == category.value ||
+            item.itemType == category.value || ...
+        }
+    }
+}
+```
+
+**问题**：
+
+- 服务端 `GET /api/feed` 本身支持 `?category=` 参数，但 `FeedRepository.loadFeed()` 调用时 `category` **始终传 null**（FolderViewModel.loadFeed() 没有传入 selectedCategory）。
+- 分类完全在客户端做，导致 `loadMore` 拉取的 20 条里如果没有目标分类的数据，过滤后可能变成 0 条，但 `hasMore` 还是 true，不断触发加载。
+- 切换分类时不会重新请求服务端，数据量受限于首次加载的 20 条。
+
+**修复方向**：切换分类时调用 `loadFeed(category = category.value)`，并把 `category` 参数传给 `FeedRepository.loadFeed()`。
 
 ---
 
-## 验证计划
+### 🟡 Bug 4：`mergeLocalInteractions` 的合并逻辑有歧义
 
-### 1. 服务端验证
-* 使用 Postman 或 Curl 验证上报接口能否正确让对应的 `exposure_count`、`click_count` 和 `play_count` + 1：
-  `curl -X POST http://localhost:8000/api/items/custom_xxx/exposure`
+**位置**：[FolderViewModel.kt#L522](file:///e:/NekoFeed/app/src/main/java/com/ico/nekofeed/ui/feed/FolderViewModel.kt#L522-L541)
 
-### 2. 客户端跨页面同步验证
-* 进入商品详情页，点击点赞按钮。
-* 观察详情页的点赞图标颜色发生切换（红心）。
-* 返回首页列表，观察该商品的点赞数量递增且红心亮起。
+```kotlin
+if (local != null && !item.isLiked && !item.isCollected && item.likeCount == 0 && item.collectCount == 0) {
+    // 用本地覆盖服务端
+} else if (local != null) {
+    // 用服务端覆盖本地（同步回 DB）
+}
+```
 
-### 3. 曝光与点击埋点验证
-* 打开 Logcat，滑动首页列表，检查是否每滑入一个新的卡片都触发一次曝光日志打印。
-* 点击进入详情页，检查 Logcat 是否伴随有 `POST /api/items/{id}/click` 发送。
-* 进入 `Stats`（数据统计）页面，验证曝光率、点击率和各项统计折线/柱状图数据有真实累计（不再全为 0）。
+**问题**：条件是"服务端返回的 likeCount == 0 **且** isLiked == false 才用本地"，但若用户在登录态点赞，服务端 likeCount 就是 1，这时本地的离线点赞状态会被**丢弃**并用服务端值覆盖。适合离线-首次场景，但对"未登录点赞 → 登录后数据同步"的场景有逻辑漏洞。
 
-### 4. 视频播放器复用验证
-* 找到一个视频卡片，点击播放，声音和视频能够正常加载并输出。
-* 点击卡片进入详情页，视频能够无缝衔接直接在详情页顶部自动继续播放。
-* 在详情页按返回键，播放器的状态能正常回收或停止，不会产生后台音频泄露或闪退。
+---
+
+### 🟡 Bug 5：`FeedDetailScreen` 无 ViewModel，点击统计和 AI 状态同步是靠父级 ViewModel 传递
+
+**位置**：[AppNavHost.kt#L195](file:///e:/NekoFeed/app/src/main/java/com/ico/nekofeed/navigation/AppNavHost.kt#L195-L208)
+
+```kotlin
+val item = remember(decodedId, uiState.items) { feedViewModel.getItemById(decodedId) }
+FeedDetailScreen(
+    item = item,
+    onAiRequest = { feedViewModel.requestAiAnalysis(it) }
+)
+```
+
+**问题**：
+
+- `FeedDetailScreen` 打开后如果 `FeedViewModel` 的 `allItems` 被 `loadMore` 更新，`remember` 不会自动重组（`remember` 依赖的是值相等性，`FeedItem` 是 data class，会重新查找但不触发 UI 更新）。
+- 详情页的 `isAiLoading` 动画依赖 `item.isAiLoading`，但这个状态的更新是异步更新 `allItems`，要触发重组需要 detail screen 也观察 `uiState`，目前没有。
+- 进入详情页本应记录 `clickCount++` 和 `history`，但没有调用。
+
+---
+
+### 🟡 Bug 6：`FeedItem.isLiked` / `isCollected` 等字段是 `var`，但 data class 应该是不可变的
+
+**位置**：[FeedItem.kt#L54](file:///e:/NekoFeed/app/src/main/java/com/ico/nekofeed/data/model/FeedItem.kt#L54-L70)
+
+```kotlin
+var isLiked: Boolean = false       // ❌ var in data class
+var isCollected: Boolean = false
+var likeCount: Int = 0
+...
+```
+
+这些字段声明为 `var` 但整个 ViewModel 逻辑都是通过 `.copy()` 创建新实例，`var` 是多余且危险的（外部代码可直接修改引用）。应全部改为 `val`。
+
+---
+
+### 🟡 Bug 7：`SearchScreen` 搜索源是 `feedViewModel.getAllItems()`（snapshot），不是响应式的
+
+**位置**：[AppNavHost.kt#L220](file:///e:/NekoFeed/app/src/main/java/com/ico/nekofeed/navigation/AppNavHost.kt#L220)
+
+```kotlin
+allItems = feedViewModel.getAllItems()
+```
+
+`getAllItems()` 返回的是当前时刻的 `allItems` 快照，不是 `StateFlow`。如果 Feed 列表在 SearchScreen 打开后更新（loadMore），搜索不会感知到新数据。
+
+---
+
+## 3. 未完成的功能点
+
+### ❌ PlayerManager / 视频播放
+
+需求 §10（PlayerManager）、§8.3（视频卡片）完全未实现：
+
+- 无 `player/` 目录
+- 无 ExoPlayer 集成
+- `playingItemId` 在 `FeedUiState` 中存在但从未被赋值
+
+### ❌ 曝光埋点
+
+需求 §14.1（通用统计）未实现。`LazyColumn` item 的可见性检测（`isVisible` / `VisibilityTracker`）没有接入。
+
+### ❌ 点击统计和历史记录
+
+进入详情页时应调用 `recordClick(itemId)` 和 `recordHistory(itemId)`（服务端有 `POST /api/items/{itemId}/history` 接口），但代码里没有调用。
+
+### ❌ Profile 页的"我的点赞"/"我的收藏"/"我的历史"
+
+**位置**：[AppNavHost.kt#L104-L106](file:///e:/NekoFeed/app/src/main/java/com/ico/nekofeed/navigation/AppNavHost.kt#L104-L106)
+
+```kotlin
+onNavigateToLikes = { },       // 空实现
+onNavigateToCollections = { }, // 空实现
+onNavigateToHistory = { },     // 空实现
+```
+
+服务端 API 都已实现（`GET /api/user/likes`、`/collections`、`/history`），客户端导航目标为空 lambda。
+
+### ❌ DetailScreen 的 "查看原文" / sourceUrl 跳转
+
+`sourceUrl` 在详情页只是显示文本，没有实现 `Intent.ACTION_VIEW` 的浏览器跳转。
+
+### ❌ 视频详情页播放器
+
+详情页的 `HeroMediaSection` 对 video 类型只展示封面或 emoji 🎬，没有 `PlayerView`。
+
+### ❌ AI 搜索的 `userProfileTags` 来源
+
+`SearchViewModel` 调用 `userProfileRepository.getTopInterestTags(5)` 提供用户画像，但 `UserProfileEntity` 是基于 `recordInteraction()` 写入的，而 `recordInteraction` 目前只在 `toggleLike/Collect/Share` 里异步调用，且 `UserProfileEntity` 的结构需要确认是否真的按 tag 聚合（从 DB 文件大小看可能未完整实现）。
+
+---
+
+## 4. 工程/架构层面的问题
+
+### ⚠️ 命名严重混乱：`Folder` vs `Feed`
+
+整个项目里大量文件以 `Folder` 命名，实际上是 Feed 功能：
+
+| 实际文件名 | 应该叫 |
+|---|---|
+| `FolderScreen.kt` | `FeedScreen.kt` |
+| `FolderViewModel.kt` | `FeedViewModel.kt` |
+| `FolderDetailScreen.kt` | `FeedDetailScreen.kt` |
+| `FolderRepository.kt` | `FeedRepository.kt` |
+| `FolderApi.kt` | `FeedApi.kt` |
+| `FolderItemCard.kt` | `FeedItemCard.kt`（冗余，已有 `FeedItemCard.kt`）|
+| `FolderResponse.kt` | `FeedResponse.kt` |
+| `OetrofitClient.kt` | `RetrofitClient.kt`（typo：`Oetrofit`）|
+
+这不影响运行，但严重影响可读性和维护性。AppNavHost 里的 import 已经用了 `FeedScreen`、`FeedDetailScreen`（别名），说明有重构一半的痕迹。
+
+### ⚠️ `RetrofitClient` 是 `lazy` 初始化的 `OkHttpClient`，但 `feedApi` 在 `updateBaseUrl` 后重建
+
+**位置**：[OetrofitClient.kt#L27-L68](file:///e:/NekoFeed/app/src/main/java/com/ico/nekofeed/data/remote/OetrofitClient.kt)
+
+`okHttpClient` 是 `by lazy` 的全局单例，`updateBaseUrl` 重建 `Retrofit` 时复用了同一个 `OkHttpClient`。这没问题。但 `FeedRepository` 在 `FeedViewModel` 构造时是这样初始化的：
+
+```kotlin
+private val repository = FeedRepository(RetrofitClient.feedApi)
+```
+
+如果用户在 `AiSettingsScreen` 修改了 Server URL 并 `restartApp()`，则 `recreate()` 会重建 Activity，`FeedViewModel` 是 `viewModel()` 拿到的，**Activity recreate 不会销毁 ViewModel**（只有 process kill 才会）。所以修改 URL 后 `FeedRepository` 拿的还是旧的 `feedApi` 引用。
+
+> 实际上 `RetrofitClient.feedApi` 是 `@Volatile var`，`updateBaseUrl` 时已经替换了，但 `FeedRepository` 构造时持有的是旧引用的**值拷贝**（Kotlin property），所以确实会有此问题。
+
+### ⚠️ `MainActivity` 里用了 `runBlocking`
+
+**位置**：[MainActivity.kt#L25](file:///e:/NekoFeed/app/src/main/java/com/ico/nekofeed/MainActivity.kt#L25-L39)
+
+```kotlin
+runBlocking {
+    val serverConfig = tokenManager.getServerConfig()
+    ...
+}
+runBlocking { authRepository.restoreToken() }
+```
+
+在主线程（UI 线程）用 `runBlocking` 读 DataStore，在正常情况下很快，但 DataStore 内部用了文件 I/O，这有 ANR 风险。应改为 `SplashScreen` + 协程异步加载，或用 `runBlocking` 套上 `Dispatchers.IO`。
+
+### ⚠️ `FeedViewModel` 直接在 init 里初始化所有依赖（无 DI）
+
+```kotlin
+class FeedViewModel(application: Application) : AndroidViewModel(application) {
+    private val repository = FeedRepository(RetrofitClient.feedApi)
+    private val userRepository = UserRepository(RetrofitClient.feedApi)
+    private val tokenManager = TokenManager(application)
+    private val database = NekoFeedDatabase.getInstance(application)
+    ...
+}
+```
+
+训练营项目可以接受无 Hilt，但这种硬编码依赖让单元测试完全无法进行，也让 `repository` 拿到的是 `RetrofitClient.feedApi` 的**时刻快照**（见上条）。
+
+### ⚠️ AI 并发控制 Semaphore 只在 `requestAiAnalysis` 里用，`batchGenerateAi` 没有受 Semaphore 保护
+
+**位置**：[FolderViewModel.kt#L181-L203](file:///e:/NekoFeed/app/src/main/java/com/ico/nekofeed/ui/feed/FolderViewModel.kt#L181-L203)
+
+`batchGenerateAi` 里对每个 item 顺序调用 `generateFeedAi` 并 `delay(500ms)`，这是串行的，不会并发爆炸。但如果 `batchGenerateAi` 和 `requestAiAnalysis` 同时在跑，会有两个并发路径都在请求 LLM，`aiSemaphore` 只保护 `requestAiAnalysis` 那路，两路加起来可能超过 2 并发。
+
+### ⚠️ `StatsScreen` 的 `getStats` 是同步 lambda，在 Composable 里调用
+
+```kotlin
+@Composable
+fun StatsScreen(
+    getStats: () -> StatsData,  // 同步调用
+    ...
+) {
+    val stats = getStats()  // 每次重组都调用
+```
+
+`getStats()` 内部是 `allItems.sumOf { ... }` 对所有 item 求和，如果 `allItems` 有几千条，每次重组都会有性能损耗。应改为 `remember { getStats() }` 或让 StatsViewModel 持有 `StateFlow<StatsData>`。
+
+### ⚠️ `FeedItem` 的类型/分类用裸 `String` 而非枚举
+
+```kotlin
+val category: String?
+val itemType: String?
+val cardType: String?
+```
+
+模型层用 `String`，枚举（`FeedCardType`, `FeedItemType`, `FeedCategory`）定义在同一文件的末尾作为独立 enum，但两者之间靠 `fromString()` 手动转换。这导致 `filterByCategory` 的比较是字符串比较，容易大小写问题（服务端返回 `"Tech"` vs 客户端 `"tech"`）。
+
+---
+
+## 5. 优先级建议
+
+| 优先级 | 问题 | 影响 |
+|--------|------|------|
+| 🔴 P0 | 曝光/点击埋点没有实现 | Stats 页面永远是 0，核心功能演示失败 |
+| 🔴 P0 | 分类过滤在客户端做，服务端 category 参数未使用 | 切换 Tab 数据不对，loadMore 可能死循环 |
+| 🔴 P1 | 视频播放未实现 | VideoFeedCard 只是封面展示 |
+| 🟡 P2 | Profile 页三个导航空实现 | 功能点缺失但不影响核心流程 |
+| 🟡 P2 | DetailScreen 进入时不记录 click/history | 统计和服务端数据不同步 |
+| 🟡 P2 | `FeedItem` 的 `var` 字段改为 `val` | 潜在并发安全问题 |
+| 🟢 P3 | 文件命名混乱（Folder → Feed） | 可读性问题，重构风险低 |
+| 🟢 P3 | `MainActivity` 的 `runBlocking` | ANR 风险低概率，但不规范 |
+| 🟢 P3 | `StatsScreen` 同步计算性能 | 当前数据量小，不明显 |
+
+---
+
+## 6. 已做得好的地方（值得保留）
+
+- ✅ **FeedRepository 降级策略**：服务端失败自动切换 `FallbackFeedData`，有提示 Banner，符合需求 §17。
+- ✅ **AI 缓存 + 7天过期**：`AiCacheDao` + `cleanOldCache()` 设计合理，避免重复请求。
+- ✅ **AI Semaphore 并发限制**：`Semaphore(2)` 防止请求爆炸。
+- ✅ **互动状态本地持久化**：Room DB 的 `FeedItemInteractionEntity` + `mergeLocalInteractions`，重启后状态不丢失。
+- ✅ **无限滚动检测**：`snapshotFlow` + `lastVisible >= totalCount - 3` 触发 `loadMore`，逻辑正确。
+- ✅ **下拉刷新防重入**：`isRefreshing`/`isLoadingMore` guard 写得规范。
+- ✅ **AI 请求防重复**：`requestAiAnalysis` 检查 `aiSummary.isNullOrBlank()` 和 `isAiLoading`。
+- ✅ **UI 视觉质量高**：渐变卡片、Crossfade 动画、LinearWavyProgressIndicator 等细节丰富。
+- ✅ **AiRepository 指数退避重试**：`backoffMs *= 2`，最多 3 次，有 fallback。

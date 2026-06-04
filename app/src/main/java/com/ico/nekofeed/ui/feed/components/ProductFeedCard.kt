@@ -63,6 +63,7 @@ fun ProductFeedCard(
     isAiEnabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     Column(modifier = modifier) {
         // 商品图片区域
         Box(
@@ -309,7 +310,15 @@ fun ProductFeedCard(
 
                 // 分享
                 IconButton(
-                    onClick = { onShareClick?.invoke(item.id) },
+                    onClick = { 
+                        onShareClick?.invoke(item.id)
+                        com.ico.nekofeed.util.IntentUtils.shareContent(
+                            context = context,
+                            title = item.title,
+                            content = item.summary ?: "",
+                            url = item.sourceUrl
+                        )
+                    },
                     modifier = Modifier.size(18.dp)
                 ) {
                     Icon(
@@ -329,7 +338,9 @@ fun ProductFeedCard(
                     SplitButtonLayout(
                         leadingButton = {
                             SplitButtonDefaults.LeadingButton(
-                                onClick = { /* 处理CTA点击 */ }
+                                onClick = { 
+                                    com.ico.nekofeed.util.IntentUtils.openUrl(context, item.sourceUrl)
+                                }
                             ) {
                                 Icon(
                                     imageVector = Icons.Filled.ShoppingCart,

@@ -4,8 +4,6 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.ico.nekofeed.data.local.TokenManager
-import com.ico.nekofeed.data.local.db.FeedItemInteractionDao
-import com.ico.nekofeed.data.local.db.FeedItemInteractionEntity
 import com.ico.nekofeed.data.local.db.NekoFeedDatabase
 import com.ico.nekofeed.data.model.FeedCategory
 import com.ico.nekofeed.data.model.FeedItem
@@ -31,7 +29,6 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
     private val database = NekoFeedDatabase.getInstance(application)
     val aiRepository = AiRepository(tokenManager, database.aiCacheDao())
     private val userProfileRepository = UserProfileRepository(database.userProfileDao())
-    private val interactionDao: FeedItemInteractionDao = database.feedItemInteractionDao()
 
     private val _uiState = MutableStateFlow(FeedUiState())
     val uiState: StateFlow<FeedUiState> = _uiState.asStateFlow()
@@ -41,11 +38,9 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
     private var currentOffset = 0
     private var totalServerItems = Int.MAX_VALUE
 
-    fun getAllItems(): List<FeedItem> = allItems
+    private val exposedItems = mutableSetOf<String>()
 
-    private fun isLoggedIn(): Boolean {
-        return RetrofitClient.hasToken()
-    }
+    fun getAllItems(): List<FeedItem> = allItems
 
     init {
         loadFeed()
@@ -66,18 +61,18 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
             totalServerItems = Int.MAX_VALUE
             _uiState.update { it.copy(isLoading = true, errorMessage = null, usingFallback = false, hasMore = true) }
 
-            repository.loadFeed(limit = pageSize, offset = 0).fold(
+            val category = _uiState.value.selectedCategory
+            val categoryParam = if (category == FeedCategory.FEATURED) null else category.value
+
+            repository.loadFeed(category = categoryParam, limit = pageSize, offset = 0).fold(
                 onSuccess = { items ->
-                    val merged = mergeLocalInteractions(items)
-                    allItems = merged
+                    allItems = items
                     currentOffset = items.size
-                    // Try to get the total from the response to determine hasMore
                     val hasMore = items.size >= pageSize
-                    val filteredItems = filterByCategory(items, _uiState.value.selectedCategory)
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            items = filteredItems,
+                            items = items,
                             errorMessage = null,
                             usingFallback = false,
                             hasMore = hasMore
@@ -88,7 +83,7 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
                 onFailure = { error ->
                     val fallbackItems = repository.getFallbackData()
                     allItems = fallbackItems
-                    val filteredItems = filterByCategory(fallbackItems, _uiState.value.selectedCategory)
+                    val filteredItems = filterByCategory(fallbackItems, category)
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -105,13 +100,15 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun loadMore() {
-        // Guard: don't load more if already loading, no more items, or using fallback
         if (_uiState.value.isLoadingMore || !_uiState.value.hasMore || _uiState.value.usingFallback) return
 
         viewModelScope.launch {
             _uiState.update { it.copy(isLoadingMore = true) }
 
-            repository.loadFeed(limit = pageSize, offset = currentOffset).fold(
+            val category = _uiState.value.selectedCategory
+            val categoryParam = if (category == FeedCategory.FEATURED) null else category.value
+
+            repository.loadFeed(category = categoryParam, limit = pageSize, offset = currentOffset).fold(
                 onSuccess = { newItems ->
                     if (newItems.isEmpty()) {
                         _uiState.update { it.copy(isLoadingMore = false, hasMore = false) }
@@ -119,8 +116,8 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
                         allItems = allItems + newItems
                         currentOffset += newItems.size
                         val hasMore = newItems.size >= pageSize
-                        updateFilteredItems()
-                        _uiState.update { it.copy(isLoadingMore = false, hasMore = hasMore) }
+                        val filteredItems = if (category == FeedCategory.FEATURED) allItems else filterByCategory(allItems, category)
+                        _uiState.update { it.copy(isLoadingMore = false, items = filteredItems, hasMore = hasMore) }
                         batchGenerateAi(newItems)
                     }
                 },
@@ -142,17 +139,18 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
             totalServerItems = Int.MAX_VALUE
             _uiState.update { it.copy(isRefreshing = true, hasMore = true) }
 
-            repository.loadFeed(limit = pageSize, offset = 0).fold(
+            val category = _uiState.value.selectedCategory
+            val categoryParam = if (category == FeedCategory.FEATURED) null else category.value
+
+            repository.loadFeed(category = categoryParam, limit = pageSize, offset = 0).fold(
                 onSuccess = { items ->
-                    val merged = mergeLocalInteractions(items)
-                    allItems = merged
+                    allItems = items
                     currentOffset = items.size
                     val hasMore = items.size >= pageSize
-                    val filteredItems = filterByCategory(merged, _uiState.value.selectedCategory)
                     _uiState.update {
                         it.copy(
                             isRefreshing = false,
-                            items = filteredItems,
+                            items = items,
                             errorMessage = null,
                             usingFallback = false,
                             hasMore = hasMore
@@ -163,7 +161,7 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
                 onFailure = { error ->
                     val fallbackItems = repository.getFallbackData()
                     allItems = fallbackItems
-                    val filteredItems = filterByCategory(fallbackItems, _uiState.value.selectedCategory)
+                    val filteredItems = filterByCategory(fallbackItems, category)
                     _uiState.update {
                         it.copy(
                             isRefreshing = false,
@@ -209,7 +207,6 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
         if (!item.aiSummary.isNullOrBlank() || item.isAiLoading) return
 
         viewModelScope.launch {
-            // Check cache first
             val cached = aiRepository.getCache(item.id)
             if (cached != null) {
                 val updatedTags = parseTagsFromCache(cached.aiTags)
@@ -227,11 +224,9 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
                 return@launch
             }
 
-            // Check config
             val config = tokenManager.getLlmConfig()
             if (!config.aiEnabled || config.baseUrl.isBlank()) return@launch
 
-            // Set state to loading
             allItems = allItems.map { it ->
                 if (it.id == item.id) {
                     it.copy(isAiLoading = true)
@@ -239,12 +234,10 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
             }
             updateFilteredItems()
 
-            // Run generation with semaphore limit
             val result = aiSemaphore.withPermit {
                 aiRepository.generateFeedAi(item)
             }
 
-            // Update item with result
             allItems = allItems.map { it ->
                 if (it.id == item.id) {
                     if (result != null) {
@@ -283,6 +276,10 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { it.copy(items = filteredItems) }
     }
 
+    fun setPlayingItemId(id: String?) {
+        _uiState.update { it.copy(playingItemId = id) }
+    }
+
     fun toggleLike(itemId: String) {
         val item = allItems.find { it.id == itemId }
         if (item != null) {
@@ -291,51 +288,39 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-        if (!isLoggedIn()) {
-            val toggled = allItems.map { item ->
-                if (item.id == itemId) {
-                    item.copy(
-                        isLiked = !item.isLiked,
-                        likeCount = if (item.isLiked) item.likeCount - 1 else item.likeCount + 1,
-                        aiTags = item.aiTags ?: emptyList()
-                    )
-                } else item
-            }
-            allItems = toggled
-            updateFilteredItems()
-            toggled.find { it.id == itemId }?.let { persistInteraction(it) }
-            return
+        // 乐观更新
+        val snapshot = allItems
+        allItems = allItems.map { item ->
+            if (item.id == itemId) {
+                item.copy(
+                    isLiked = !item.isLiked,
+                    likeCount = if (item.isLiked) item.likeCount - 1 else item.likeCount + 1
+                )
+            } else item
         }
+        updateFilteredItems()
 
+        // 服务端同步（不区分登录/匿名，都走 API）
         viewModelScope.launch {
             userRepository.toggleLike(itemId).fold(
                 onSuccess = { interaction ->
+                    // 用服务端权威值覆盖
                     allItems = allItems.map { item ->
                         if (item.id == itemId) {
                             item.copy(
                                 isLiked = interaction.isLiked,
                                 likeCount = interaction.likeCount,
                                 isCollected = interaction.isCollected,
-                                collectCount = interaction.collectCount,
-                                aiTags = item.aiTags ?: emptyList()
+                                collectCount = interaction.collectCount
                             )
                         } else item
                     }
                     updateFilteredItems()
-                    allItems.find { it.id == itemId }?.let { persistInteraction(it) }
                 },
                 onFailure = {
-                    allItems = allItems.map { item ->
-                        if (item.id == itemId) {
-                            item.copy(
-                                isLiked = !item.isLiked,
-                                likeCount = if (item.isLiked) item.likeCount - 1 else item.likeCount + 1,
-                                aiTags = item.aiTags ?: emptyList()
-                            )
-                        } else item
-                    }
+                    // 回滚
+                    allItems = snapshot
                     updateFilteredItems()
-                    allItems.find { it.id == itemId }?.let { persistInteraction(it) }
                 }
             )
         }
@@ -349,51 +334,39 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-        if (!isLoggedIn()) {
-            val toggled = allItems.map { item ->
-                if (item.id == itemId) {
-                    item.copy(
-                        isCollected = !item.isCollected,
-                        collectCount = if (item.isCollected) item.collectCount - 1 else item.collectCount + 1,
-                        aiTags = item.aiTags ?: emptyList()
-                    )
-                } else item
-            }
-            allItems = toggled
-            updateFilteredItems()
-            toggled.find { it.id == itemId }?.let { persistInteraction(it) }
-            return
+        // 乐观更新
+        val snapshot = allItems
+        allItems = allItems.map { item ->
+            if (item.id == itemId) {
+                item.copy(
+                    isCollected = !item.isCollected,
+                    collectCount = if (item.isCollected) item.collectCount - 1 else item.collectCount + 1
+                )
+            } else item
         }
+        updateFilteredItems()
 
+        // 服务端同步（不区分登录/匿名，都走 API）
         viewModelScope.launch {
             userRepository.toggleCollect(itemId).fold(
                 onSuccess = { interaction ->
+                    // 用服务端权威值覆盖
                     allItems = allItems.map { item ->
                         if (item.id == itemId) {
                             item.copy(
                                 isLiked = interaction.isLiked,
                                 likeCount = interaction.likeCount,
                                 isCollected = interaction.isCollected,
-                                collectCount = interaction.collectCount,
-                                aiTags = item.aiTags ?: emptyList()
+                                collectCount = interaction.collectCount
                             )
                         } else item
                     }
                     updateFilteredItems()
-                    allItems.find { it.id == itemId }?.let { persistInteraction(it) }
                 },
                 onFailure = {
-                    allItems = allItems.map { item ->
-                        if (item.id == itemId) {
-                            item.copy(
-                                isCollected = !item.isCollected,
-                                collectCount = if (item.isCollected) item.collectCount - 1 else item.collectCount + 1,
-                                aiTags = item.aiTags ?: emptyList()
-                            )
-                        } else item
-                    }
+                    // 回滚
+                    allItems = snapshot
                     updateFilteredItems()
-                    allItems.find { it.id == itemId }?.let { persistInteraction(it) }
                 }
             )
         }
@@ -409,7 +382,7 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
 
         allItems = allItems.map { item ->
             if (item.id == itemId) {
-                item.copy(shareCount = item.shareCount + 1, aiTags = item.aiTags ?: emptyList())
+                item.copy(shareCount = item.shareCount + 1)
             } else item
         }
         updateFilteredItems()
@@ -424,6 +397,31 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
         }
         _uiState.update { it.copy(selectedTags = currentTags) }
         updateFilteredItems()
+    }
+
+    fun recordExposure(itemId: String) {
+        if (exposedItems.contains(itemId)) return
+        exposedItems.add(itemId)
+
+        allItems = allItems.map { item ->
+            if (item.id == itemId) {
+                item.copy(exposureCount = item.exposureCount + 1)
+            } else item
+        }
+        updateFilteredItems()
+    }
+
+    fun recordClick(itemId: String) {
+        allItems = allItems.map { item ->
+            if (item.id == itemId) {
+                item.copy(clickCount = item.clickCount + 1)
+            } else item
+        }
+        updateFilteredItems()
+
+        viewModelScope.launch {
+            userRepository.recordHistory(itemId)
+        }
     }
 
     fun getItemById(id: String): FeedItem? {
@@ -498,46 +496,5 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         _uiState.update { it.copy(items = filtered) }
-    }
-
-    private fun persistInteraction(item: FeedItem) {
-        viewModelScope.launch {
-            interactionDao.upsertInteraction(
-                FeedItemInteractionEntity(
-                    itemId = item.id,
-                    isLiked = item.isLiked,
-                    isCollected = item.isCollected,
-                    likeCount = item.likeCount,
-                    collectCount = item.collectCount
-                )
-            )
-        }
-    }
-
-    private suspend fun mergeLocalInteractions(items: List<FeedItem>): List<FeedItem> {
-        val localMap = interactionDao.getAllInteractions().associateBy { it.itemId }
-        if (localMap.isEmpty()) return items
-        return items.map { item ->
-            val local = localMap[item.id]
-            if (local != null && !item.isLiked && !item.isCollected && item.likeCount == 0 && item.collectCount == 0) {
-                item.copy(
-                    isLiked = local.isLiked,
-                    isCollected = local.isCollected,
-                    likeCount = local.likeCount,
-                    collectCount = local.collectCount
-                )
-            } else if (local != null) {
-                interactionDao.upsertInteraction(
-                    FeedItemInteractionEntity(
-                        itemId = item.id,
-                        isLiked = item.isLiked,
-                        isCollected = item.isCollected,
-                        likeCount = item.likeCount,
-                        collectCount = item.collectCount
-                    )
-                )
-                item
-            } else item
-        }
     }
 }

@@ -50,20 +50,55 @@
                 {% if item.is_custom %}
                 <span class="badge" style="background-color: #f1c40f;">Custom</span>
                 {% endif %}
+                {% if item.ai_enriched %}
+                <span class="badge" style="background-color: #2ecc71; color: white;">AI</span>
+                {% endif %}
             </div>
             <h4>{{ item.title }}</h4>
-            <p>{{ item.summary[:100] }}...</p>
+            <p>{{ item.summary[:100] if item.summary else '' }}{% if item.summary and item.summary|length > 100 %}...{% endif %}</p>
             <div style="font-size: 0.8rem; color: #999; margin-top: 10px;">
                 {{ item.source_name }} &bull; {{ item.published_at.strftime('%Y-%m-%d %H:%M') if item.published_at else '' }}
             </div>
             <div style="margin-top: 10px; display: flex; gap: 10px;">
                 <a href="/admin/items/{{ item.id }}" class="btn" style="flex: 1; text-align: center;">View</a>
+                <a href="/admin/items/{{ item.id }}/edit" class="btn" style="flex: 1; text-align: center; background-color: #27ae60;">Edit</a>
                 <form action="/admin/items/{{ item.id }}/delete" method="post" style="margin: 0; flex: 1;">
-                    <button type="submit" class="btn btn-danger" style="width: 100%;" onsubmit="return confirm('Delete this item?');">Delete</button>
+                    <button type="submit" class="btn btn-danger" style="width: 100%;" onclick="return confirm('Delete this item?');">Delete</button>
                 </form>
             </div>
         </div>
     </div>
     {% endfor %}
 </div>
+
+{% if total_pages > 1 %}
+<div style="display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 2rem; padding: 1rem 0;">
+    {% if page > 1 %}
+    <a href="?page={{ page - 1 }}{% if category %}&category={{ category }}{% endif %}{% if item_type %}&item_type={{ item_type }}{% endif %}" class="btn">&laquo; Prev</a>
+    {% endif %}
+
+    {% set start_page = [1, page - 2] | max %}
+    {% set end_page = [total_pages, page + 2] | min %}
+
+    {% if start_page > 1 %}
+    <a href="?page=1{% if category %}&category={{ category }}{% endif %}{% if item_type %}&item_type={{ item_type }}{% endif %}" class="btn" style="background-color: #95a5a6;">1</a>
+    {% if start_page > 2 %}<span style="color: #999;">...{% endif %}
+    {% endif %}
+
+    {% for p in range(start_page, end_page + 1) %}
+    <a href="?page={{ p }}{% if category %}&category={{ category }}{% endif %}{% if item_type %}&item_type={{ item_type }}{% endif %}" class="btn" style="{% if p == page %}background-color: #2c3e50;{% else %}background-color: #95a5a6;{% endif %}">{{ p }}</a>
+    {% endfor %}
+
+    {% if end_page < total_pages %}
+    {% if end_page < total_pages - 1 %}<span style="color: #999;">...{% endif %}
+    <a href="?page={{ total_pages }}{% if category %}&category={{ category }}{% endif %}{% if item_type %}&item_type={{ item_type }}{% endif %}" class="btn" style="background-color: #95a5a6;">{{ total_pages }}</a>
+    {% endif %}
+
+    {% if page < total_pages %}
+    <a href="?page={{ page + 1 }}{% if category %}&category={{ category }}{% endif %}{% if item_type %}&item_type={{ item_type }}{% endif %}" class="btn">Next &raquo;</a>
+    {% endif %}
+
+    <span style="color: #666; margin-left: 1rem;">{{ total }} items total</span>
+</div>
+{% endif %}
 {% endblock %}

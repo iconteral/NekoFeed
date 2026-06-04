@@ -63,6 +63,10 @@ dependencies {
     // Kotlin JSON serialization
     implementation(libs.kotlinx.serialization.json)
 
+    // Media3 (ExoPlayer)
+    implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.ui)
+
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

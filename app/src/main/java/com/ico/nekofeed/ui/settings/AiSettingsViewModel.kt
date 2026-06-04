@@ -5,8 +5,10 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.ico.nekofeed.data.local.LlmConfig
+import com.ico.nekofeed.data.local.ServerConfig
 import com.ico.nekofeed.data.local.TokenManager
 import com.ico.nekofeed.data.local.db.NekoFeedDatabase
+import com.ico.nekofeed.data.remote.RetrofitClient
 import com.ico.nekofeed.data.repository.AiRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,6 +17,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class AiSettingsUiState(
+    val serverEndpoint: String = TokenManager.DEFAULT_SERVER_BASE_URL,
     val baseUrl: String = "",
     val model: String = "gpt-4o-mini",
     val apiKey: String = "",
@@ -42,10 +45,12 @@ class AiSettingsViewModel(application: Application) : AndroidViewModel(applicati
 
     private fun loadConfig() {
         viewModelScope.launch {
+            val serverConfig = tokenManager.getServerConfig()
             val config = tokenManager.getLlmConfig()
             val count = aiRepository.getCacheCount()
             _uiState.update {
                 it.copy(
+                    serverEndpoint = serverConfig.baseUrl,
                     baseUrl = config.baseUrl,
                     model = config.model,
                     apiKey = config.apiKey,
@@ -59,6 +64,10 @@ class AiSettingsViewModel(application: Application) : AndroidViewModel(applicati
 
     fun updateBaseUrl(value: String) {
         _uiState.update { it.copy(baseUrl = value, saveSuccess = false) }
+    }
+
+    fun updateServerEndpoint(value: String) {
+        _uiState.update { it.copy(serverEndpoint = value, saveSuccess = false) }
     }
 
     fun updateModel(value: String) {
@@ -81,6 +90,13 @@ class AiSettingsViewModel(application: Application) : AndroidViewModel(applicati
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true) }
             val state = _uiState.value
+
+            val serverConfig = ServerConfig(
+                baseUrl = state.serverEndpoint.trim().ifEmpty { TokenManager.DEFAULT_SERVER_BASE_URL }
+            )
+            tokenManager.saveServerConfig(serverConfig)
+            RetrofitClient.updateBaseUrl(serverConfig.baseUrl)
+
             val config = LlmConfig(
                 baseUrl = state.baseUrl.trim(),
                 model = state.model.trim(),
@@ -137,5 +153,9 @@ class AiSettingsViewModel(application: Application) : AndroidViewModel(applicati
             val count = aiRepository.getCacheCount()
             _uiState.update { it.copy(cacheCount = count) }
         }
+    }
+
+    fun resetSaveSuccess() {
+        _uiState.update { it.copy(saveSuccess = false) }
     }
 }

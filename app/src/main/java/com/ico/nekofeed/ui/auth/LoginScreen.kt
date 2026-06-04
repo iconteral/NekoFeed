@@ -56,9 +56,11 @@ fun LoginScreen(
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
+    var hasNavigated by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.isLoggedIn) {
-        if (uiState.isLoggedIn) {
+        if (uiState.isLoggedIn && !hasNavigated) {
+            hasNavigated = true
             onLoginSuccess()
         }
     }

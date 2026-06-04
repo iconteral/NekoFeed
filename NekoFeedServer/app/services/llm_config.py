@@ -15,9 +15,9 @@ class LlmConfig:
             self.api_key = os.getenv("LLM_API_KEY", "")
             self.model = os.getenv("LLM_MODEL", "gpt-4o-mini")
             
-        self.max_tokens = int(os.getenv("LLM_MAX_TOKENS", "1024"))
+        self.max_tokens = int(os.getenv("LLM_MAX_TOKENS", "2048"))
         self.temperature = float(os.getenv("LLM_TEMPERATURE", "0.3"))
-        self.timeout = int(os.getenv("LLM_TIMEOUT", "30"))
+        self.timeout = int(os.getenv("LLM_TIMEOUT", "180"))
 
     def _get_db_setting(self, db: Session, key: str) -> str:
         setting = db.query(SystemSetting).filter(SystemSetting.key == key).first()

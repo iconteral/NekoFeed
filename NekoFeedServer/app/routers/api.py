@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, Query, HTTPException, BackgroundTasks
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import Optional
 from app.database import get_db
-from app.models import UpstreamFeed, FeedItem
+from app.models import UpstreamFeed, FeedItem, UserLike, UserCollect, User
 from app.schemas import FeedResponse
+from app.auth import get_or_create_device_user
 from app.services.feed_fetcher import fetch_and_process_feed
 import logging
 
@@ -18,6 +20,7 @@ def get_feed(
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
     base_url: Optional[str] = None,
+    current_user: Optional[User] = Depends(get_or_create_device_user),
     db: Session = Depends(get_db)
 ):
     query = db.query(FeedItem)
@@ -28,6 +31,37 @@ def get_feed(
          
     total = query.count()
     items = query.order_by(FeedItem.published_at.desc()).offset(offset).limit(limit).all()
+    
+    # 批量查询当前用户的互动状态（避免 N+1）
+    item_ids = [item.id for item in items]
+    
+    like_counts = {}
+    collect_counts = {}
+    user_likes = set()
+    user_collects = set()
+    
+    if item_ids:
+        # 聚合查询 like_count / collect_count
+        for item_id, cnt in db.query(UserLike.item_id, func.count()).filter(
+            UserLike.item_id.in_(item_ids)
+        ).group_by(UserLike.item_id).all():
+            like_counts[item_id] = cnt
+            
+        for item_id, cnt in db.query(UserCollect.item_id, func.count()).filter(
+            UserCollect.item_id.in_(item_ids)
+        ).group_by(UserCollect.item_id).all():
+            collect_counts[item_id] = cnt
+        
+        # 当前用户的互动
+        if current_user:
+            user_likes = {row.item_id for row in db.query(UserLike.item_id).filter(
+                UserLike.user_id == current_user.id,
+                UserLike.item_id.in_(item_ids)
+            ).all()}
+            user_collects = {row.item_id for row in db.query(UserCollect.item_id).filter(
+                UserCollect.user_id == current_user.id,
+                UserCollect.item_id.in_(item_ids)
+            ).all()}
     
     result_items = []
     for item in items:
@@ -51,6 +85,12 @@ def get_feed(
              "ai_tags": item.ai_tags.split(',') if item.ai_tags else [],
              "ai_reason": item.ai_reason,
              "ai_enriched": item.ai_enriched or False,
+             # 互动状态
+             "is_liked": item.id in user_likes,
+             "is_collected": item.id in user_collects,
+             "like_count": like_counts.get(item.id, 0),
+             "collect_count": collect_counts.get(item.id, 0),
+             "share_count": 0,
         }
         
         # Resolve Image URL
