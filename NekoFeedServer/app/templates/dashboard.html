@@ -24,13 +24,14 @@
 
 <div class="card" style="margin-top: 2rem;">
     <h3>Quick Actions</h3>
-    <div style="display: flex; gap: 1rem;">
+    <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
         <form action="/api/refresh" method="post" style="margin: 0; display: inline-block;">
             <button type="submit" class="btn">Refresh All Feeds</button>
         </form>
         <a href="/admin/feeds" class="btn">Manage Feeds</a>
         <a href="/admin/items/new" class="btn">Add Custom Ad/Item</a>
         <a href="/admin/users" class="btn">Manage Users</a>
+        <a href="/admin/llm" class="btn" style="background: linear-gradient(135deg, #6366f1, #a855f7); border: none; font-weight: 500;">AI Content Enrichment</a>
     </div>
 </div>
 {% endblock %}

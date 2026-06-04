@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request, Form, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, Request, Form, HTTPException, UploadFile, File, BackgroundTasks
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -211,3 +211,104 @@ def toggle_user(user_id: int, db: Session = Depends(get_db)):
         user.is_active = not user.is_active
         db.commit()
     return RedirectResponse(url="/admin/users", status_code=303)
+
+
+# ===== LLM Enrichment Routes =====
+
+from app.database import SessionLocal
+from app.services.llm_config import LlmConfig
+from app.services.llm_enrichment import enrich_items, enrichment_status, test_llm_connection
+
+@router.get("/llm", response_class=HTMLResponse)
+def llm_settings_page(request: Request, db: Session = Depends(get_db)):
+    """LLM configuration and enrichment operations page"""
+    config = LlmConfig(db)
+    
+    total_items = db.query(FeedItem).count()
+    unenriched = db.query(FeedItem).filter(FeedItem.ai_enriched == False).count()
+    enriched = total_items - unenriched
+    
+    return templates.TemplateResponse(request=request, name="llm_settings.html", context={
+        "request": request,
+        "config": config,
+        "total_items": total_items,
+        "unenriched": unenriched,
+        "enriched": enriched,
+        "status": enrichment_status,
+    })
+
+@router.post("/llm/config")
+def save_llm_config(
+    base_url: str = Form(...),
+    api_key: str = Form(""),
+    model: str = Form("gpt-4o-mini"),
+    db: Session = Depends(get_db)
+):
+    """Save config to database settings"""
+    LlmConfig.save_config(db, base_url, api_key, model)
+    return RedirectResponse(url="/admin/llm", status_code=303)
+
+@router.post("/llm/test")
+async def test_connection(
+    base_url: str = Form(...),
+    api_key: str = Form(""),
+    model: str = Form("gpt-4o-mini")
+):
+    """Test LLM connection and return connection status"""
+    config = LlmConfig()
+    config.base_url = base_url.strip()
+    config.api_key = api_key.strip()
+    config.model = model.strip()
+    
+    if not config.is_configured:
+        return {"success": False, "message": "Endpoint URL is required."}
+        
+    try:
+        success = await test_llm_connection(config)
+        if success:
+            return {"success": True, "message": "Connection test succeeded!"}
+        else:
+            return {"success": False, "message": "Connection failed."}
+    except Exception as e:
+        return {"success": False, "message": f"Connection error: {str(e)}"}
+
+@router.post("/llm/enrich")
+def trigger_enrichment(
+    background_tasks: BackgroundTasks,
+    count: int = Form(10),
+    reprocess: bool = Form(False),
+    db: Session = Depends(get_db)
+):
+    """Manually trigger background task for LLM enrichment"""
+    config = LlmConfig(db)
+    if not config.is_configured:
+        return RedirectResponse(url="/admin/llm?error=not_configured", status_code=303)
+        
+    if enrichment_status["running"]:
+        return RedirectResponse(url="/admin/llm?error=already_running", status_code=303)
+        
+    query = db.query(FeedItem)
+    if not reprocess:
+        query = query.filter(FeedItem.ai_enriched == False)
+    
+    items = query.order_by(FeedItem.published_at.desc()).limit(count).all()
+    item_ids = [item.id for item in items]
+    
+    if not item_ids:
+        return RedirectResponse(url="/admin/llm?error=no_items", status_code=303)
+        
+    background_tasks.add_task(enrich_items, SessionLocal, item_ids, config)
+    return RedirectResponse(url="/admin/llm", status_code=303)
+
+@router.get("/llm/status")
+def get_enrichment_status():
+    """Retrieve enrichment status for polling"""
+    return enrichment_status
+
+@router.post("/llm/cancel")
+def cancel_enrichment():
+    """Cancel the current enrichment job"""
+    global enrichment_status
+    if enrichment_status["running"]:
+        enrichment_status["running"] = False
+    return RedirectResponse(url="/admin/llm", status_code=303)

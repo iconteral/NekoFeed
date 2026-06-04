@@ -39,6 +39,25 @@ class FeedItem(Base):
     published_at = Column(DateTime, nullable=True)
     raw_json = Column(Text, nullable=True)
 
+    # Commercial/ad fields
+    brand = Column(String, nullable=True)
+    cta_text = Column(String, nullable=True)
+    price_text = Column(String, nullable=True)
+    is_sponsored = Column(Boolean, default=False)
+
+    # AI enriched fields
+    ai_summary = Column(Text, nullable=True)
+    ai_tags = Column(String, nullable=True) # Comma separated
+    ai_reason = Column(String, nullable=True)
+    ai_enriched = Column(Boolean, default=False)
+
+
+class SystemSetting(Base):
+    __tablename__ = "system_settings"
+
+    key = Column(String, primary_key=True, index=True)
+    value = Column(String, nullable=True)
+
 
 class User(Base):
     __tablename__ = "users"

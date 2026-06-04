@@ -76,6 +76,26 @@ def normalize_feed_item(entry, feed_id: int, feed_name: str, feed_category: str)
     else:
         summary = title
 
+    # Attempt to extract video URL
+    media_url = None
+    if 'media_content' in entry and len(entry.media_content) > 0:
+        for media in entry.media_content:
+            if media.get('medium') == 'video' or 'video' in media.get('type', ''):
+                media_url = media.get('url')
+                break
+    if not media_url and 'enclosures' in entry:
+        for enc in entry.enclosures:
+            if enc.get('type', '').startswith('video/') or any(enc.get('href', '').endswith(ext) for ext in ['.mp4', '.mkv', '.avi', '.mov']):
+                media_url = enc.get('href')
+                break
+
+    item_type = 'article'
+    if media_url:
+        item_type = 'video'
+        card_type = 'video'
+    else:
+        card_type = 'large_image' if image_url else 'small_image'
+
     raw_json = json.dumps({k: v for k, v in entry.items() if isinstance(v, (str, int, float, bool, list, dict))}, default=str)
 
     return {
@@ -87,9 +107,10 @@ def normalize_feed_item(entry, feed_id: int, feed_name: str, feed_category: str)
         'source_name': feed_name,
         'source_url': link,
         'category': feed_category,
-        'item_type': 'article',
-        'card_type': 'large_image' if image_url else 'small_image',
+        'item_type': item_type,
+        'card_type': card_type,
         'image_url': image_url,
+        'media_url': media_url,
         'published_at': published_at,
         'raw_json': raw_json
     }

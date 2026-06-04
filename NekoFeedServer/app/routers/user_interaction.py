@@ -241,5 +241,13 @@ def _item_to_dict(item: FeedItem) -> dict:
         "image_url": item.image_url,
         "media_url": item.media_url,
         "tags": item.tags.split(',') if item.tags else [],
-        "published_at": item.published_at
+        "published_at": item.published_at,
+        "brand": item.brand,
+        "cta_text": item.cta_text,
+        "price_text": item.price_text,
+        "is_sponsored": item.is_sponsored or False,
+        "ai_summary": item.ai_summary,
+        "ai_tags": item.ai_tags.split(',') if item.ai_tags else [],
+        "ai_reason": item.ai_reason,
+        "ai_enriched": item.ai_enriched or False,
     }

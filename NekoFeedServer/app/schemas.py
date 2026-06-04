@@ -56,6 +56,14 @@ class FeedItemResponse(BaseModel):
     mediaUrl: Optional[str] = Field(None, alias="media_url")
     tags: List[str] = []
     publishedAt: Optional[datetime] = Field(None, alias="published_at")
+    brand: Optional[str] = None
+    ctaText: Optional[str] = Field(None, alias="cta_text")
+    priceText: Optional[str] = Field(None, alias="price_text")
+    isSponsored: bool = Field(False, alias="is_sponsored")
+    aiSummary: Optional[str] = Field(None, alias="ai_summary")
+    aiTags: List[str] = Field([], alias="ai_tags")
+    aiReason: Optional[str] = Field(None, alias="ai_reason")
+    aiEnriched: bool = Field(False, alias="ai_enriched")
     
     class Config:
         populate_by_name = True

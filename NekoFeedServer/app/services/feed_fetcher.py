@@ -26,6 +26,13 @@ async def process_feed_item(db: Session, normalized_data: dict):
              logger.warning(f"Skipping item {normalized_data['id']} due to failed media download: {image_url}")
              return
 
+    # Attempt to download video if present
+    media_url = normalized_data.get('media_url')
+    if media_url:
+        local_path = await download_media(media_url, is_video=True)
+        if local_path:
+            normalized_data['local_media_path'] = local_path
+
     new_item = FeedItem(**normalized_data)
     db.add(new_item)
     db.commit()

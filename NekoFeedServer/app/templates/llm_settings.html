@@ -1,0 +1,628 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+
+    .ai-dashboard {
+        font-family: 'Outfit', sans-serif;
+        margin-top: 1rem;
+        color: #1e293b;
+    }
+
+    /* Header Banner */
+    .ai-banner {
+        background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
+        padding: 2.5rem;
+        border-radius: 16px;
+        color: white;
+        margin-bottom: 2rem;
+        box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.3);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .ai-banner::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+        pointer-events: none;
+    }
+
+    .ai-banner h1 {
+        margin: 0;
+        font-size: 2.2rem;
+        font-weight: 700;
+        letter-spacing: -0.025em;
+        color: white;
+    }
+
+    .ai-banner p {
+        margin: 0.5rem 0 0 0;
+        font-size: 1.1rem;
+        opacity: 0.9;
+        font-weight: 300;
+    }
+
+    /* Grid Layout */
+    .ai-grid {
+        display: grid;
+        grid-template-columns: 1fr 1.2fr;
+        gap: 2rem;
+    }
+
+    @media (max-width: 900px) {
+        .ai-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    /* Cards */
+    .ai-card {
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        padding: 2rem;
+        border-radius: 16px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .ai-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+    }
+
+    .ai-card-title {
+        font-size: 1.4rem;
+        font-weight: 600;
+        margin-top: 0;
+        margin-bottom: 1.5rem;
+        color: #0f172a;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        border-bottom: 1px solid #e2e8f0;
+        padding-bottom: 0.75rem;
+    }
+
+    /* Form Styling */
+    .ai-form-group {
+        margin-bottom: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .ai-form-group label {
+        font-size: 0.9rem;
+        font-weight: 500;
+        color: #475569;
+    }
+
+    .ai-form-group input, .ai-form-group select {
+        padding: 0.75rem 1rem;
+        border: 1.5px solid #cbd5e1;
+        border-radius: 8px;
+        font-size: 0.95rem;
+        outline: none;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        background: #f8fafc;
+    }
+
+    .ai-form-group input:focus, .ai-form-group select:focus {
+        border-color: #6366f1;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+        background: white;
+    }
+
+    .ai-btn-group {
+        display: flex;
+        gap: 1rem;
+        margin-top: 1.5rem;
+    }
+
+    /* Buttons */
+    .ai-btn {
+        flex: 1;
+        padding: 0.75rem 1.25rem;
+        border-radius: 8px;
+        font-weight: 500;
+        font-size: 0.95rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+
+    .ai-btn-primary {
+        background: #6366f1;
+        color: white;
+        box-shadow: 0 4px 10px rgba(99, 102, 241, 0.2);
+    }
+
+    .ai-btn-primary:hover {
+        background: #4f46e5;
+        box-shadow: 0 6px 15px rgba(99, 102, 241, 0.3);
+    }
+
+    .ai-btn-secondary {
+        background: #f1f5f9;
+        color: #475569;
+        border: 1.5px solid #e2e8f0;
+    }
+
+    .ai-btn-secondary:hover {
+        background: #e2e8f0;
+        color: #1e293b;
+    }
+
+    .ai-btn-danger {
+        background: #ef4444;
+        color: white;
+        box-shadow: 0 4px 10px rgba(239, 68, 68, 0.2);
+    }
+
+    .ai-btn-danger:hover {
+        background: #dc2626;
+    }
+
+    .ai-btn-pulse {
+        background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+        color: white;
+        font-size: 1.1rem;
+        padding: 1rem;
+        font-weight: 600;
+        box-shadow: 0 6px 20px rgba(168, 85, 247, 0.3);
+        animation: pulse-shadow 2s infinite;
+    }
+
+    @keyframes pulse-shadow {
+        0% {
+            box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.5);
+        }
+        70% {
+            box-shadow: 0 0 0 10px rgba(168, 85, 247, 0);
+        }
+        100% {
+            box-shadow: 0 0 0 0 rgba(168, 85, 247, 0);
+        }
+    }
+
+    /* Stats Board */
+    .ai-stats-board {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .ai-stat-card {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 1rem;
+        text-align: center;
+    }
+
+    .ai-stat-card .label {
+        font-size: 0.85rem;
+        color: #64748b;
+        font-weight: 500;
+        margin-bottom: 0.25rem;
+    }
+
+    .ai-stat-card .value {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: #0f172a;
+    }
+
+    /* Progress UI */
+    .progress-container {
+        margin-top: 1.5rem;
+        background: #f1f5f9;
+        border-radius: 12px;
+        padding: 1.5rem;
+        border: 1px solid #e2e8f0;
+    }
+
+    .progress-header {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.95rem;
+        font-weight: 600;
+        margin-bottom: 0.75rem;
+        color: #334155;
+    }
+
+    .progress-bar-bg {
+        background: #cbd5e1;
+        height: 12px;
+        border-radius: 6px;
+        overflow: hidden;
+        margin-bottom: 0.75rem;
+        position: relative;
+    }
+
+    .progress-bar-fill {
+        background: linear-gradient(90deg, #6366f1, #a855f7);
+        height: 100%;
+        width: 0%;
+        border-radius: 6px;
+        transition: width 0.4s ease;
+    }
+
+    .progress-details {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.85rem;
+        color: #64748b;
+    }
+
+    .progress-details span {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+
+    /* Badges & Toast */
+    .status-badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+
+    .badge-running {
+        background: #dbeafe;
+        color: #1e40af;
+        animation: blink 1.5s infinite;
+    }
+
+    .badge-idle {
+        background: #f1f5f9;
+        color: #475569;
+    }
+
+    @keyframes blink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.6; }
+    }
+
+    .toast {
+        padding: 0.75rem 1rem;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        margin-top: 1rem;
+        display: none;
+        font-weight: 500;
+    }
+
+    .toast-success {
+        background: #dcfce7;
+        color: #14532d;
+        border: 1px solid #bbf7d0;
+    }
+
+    .toast-error {
+        background: #fee2e2;
+        color: #7f1d1d;
+        border: 1px solid #fca5a5;
+    }
+
+    /* Logs view */
+    .log-box {
+        margin-top: 1.5rem;
+        background: #0f172a;
+        color: #38bdf8;
+        font-family: 'Courier New', Courier, monospace;
+        padding: 1rem;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        max-height: 150px;
+        overflow-y: auto;
+        border: 1px solid #334155;
+    }
+
+    /* Switch toggle */
+    .switch-container {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .switch {
+        position: relative;
+        display: inline-block;
+        width: 48px;
+        height: 24px;
+    }
+
+    .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background-color: #cbd5e1;
+        transition: .3s;
+        border-radius: 24px;
+    }
+
+    .slider:before {
+        position: absolute;
+        content: "";
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: .3s;
+        border-radius: 50%;
+    }
+
+    input:checked + .slider {
+        background-color: #6366f1;
+    }
+
+    input:checked + .slider:before {
+        transform: translateX(24px);
+    }
+</style>
+
+<div class="ai-dashboard">
+    <!-- Top banner -->
+    <div class="ai-banner">
+        <h1>AI Intelligent Content Enrichment</h1>
+        <p>Enhance feed items with tags, summaries, categories, and ad metadata using LLMs</p>
+    </div>
+
+    <!-- Main Content Grid -->
+    <div class="ai-grid">
+        <!-- Configuration Card -->
+        <div class="ai-card">
+            <h2 class="ai-card-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                LLM Configuration
+            </h2>
+            <form id="configForm" method="POST" action="/admin/llm/config" style="max-width: 100%;">
+                <div class="ai-form-group">
+                    <label for="base_url">API Base URL</label>
+                    <input type="url" id="base_url" name="base_url" placeholder="https://api.openai.com/v1" value="{{ config.base_url }}" required>
+                </div>
+                <div class="ai-form-group">
+                    <label for="api_key">API Key (Bearer Token)</label>
+                    <input type="password" id="api_key" name="api_key" placeholder="sk-..." value="{{ config.api_key }}">
+                </div>
+                <div class="ai-form-group">
+                    <label for="model">Model Name</label>
+                    <input type="text" id="model" name="model" placeholder="gpt-4o-mini" value="{{ config.model }}" required>
+                </div>
+                
+                <div class="ai-btn-group">
+                    <button type="submit" class="ai-btn ai-btn-primary">Save Settings</button>
+                    <button type="button" id="testBtn" class="ai-btn ai-btn-secondary">Test Connection</button>
+                </div>
+            </form>
+            <div id="testResult" class="toast"></div>
+        </div>
+
+        <!-- Enrichment Operations Card -->
+        <div class="ai-card">
+            <h2 class="ai-card-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.912 5.886L4.2 9l4.764 3.458L7.05 18.344 12 14.75l4.95 3.594-1.913-5.886L19.8 9l-5.888-.114L12 3z"/></svg>
+                Content Enrichment Hub
+            </h2>
+
+            <!-- Stats board -->
+            <div class="ai-stats-board">
+                <div class="ai-stat-card">
+                    <div class="label">Total Items</div>
+                    <div class="value" id="statTotal">{{ total_items }}</div>
+                </div>
+                <div class="ai-stat-card">
+                    <div class="label">AI Enriched</div>
+                    <div class="value" id="statEnriched">{{ enriched }}</div>
+                </div>
+                <div class="ai-stat-card">
+                    <div class="label">Unprocessed</div>
+                    <div class="value" id="statUnenriched">{{ unenriched }}</div>
+                </div>
+            </div>
+
+            <!-- Execution Form -->
+            <form id="enrichForm" method="POST" action="/admin/llm/enrich" style="max-width: 100%;">
+                <div class="ai-form-group">
+                    <label for="count">Number of Items to Enrich</label>
+                    <select id="count" name="count">
+                        <option value="5">5 items</option>
+                        <option value="10" selected>10 items</option>
+                        <option value="20">20 items</option>
+                        <option value="50">50 items</option>
+                        <option value="100">100 items</option>
+                    </select>
+                </div>
+
+                <div class="ai-form-group switch-container">
+                    <label class="switch">
+                        <input type="checkbox" id="reprocess" name="reprocess" value="true">
+                        <span class="slider"></span>
+                    </label>
+                    <span>Reprocess already enriched items</span>
+                </div>
+
+                {% if not config.is_configured %}
+                <div style="background-color: #fffbeb; border: 1px solid #fef3c7; color: #b45309; padding: 1rem; border-radius: 8px; font-size: 0.9rem; margin-bottom: 1rem;">
+                    <strong>Notice:</strong> Please configure and save your LLM credentials before running enrichment.
+                </div>
+                {% endif %}
+
+                <div class="ai-btn-group" style="margin-top: 1.5rem;">
+                    <button type="submit" id="enrichSubmitBtn" class="ai-btn ai-btn-pulse" style="width: 100%;" {% if not config.is_configured %}disabled{% endif %}>
+                        🚀 Start AI Enrichment
+                    </button>
+                </div>
+            </form>
+
+            <!-- Real-time Progress Container -->
+            <div id="progressUi" class="progress-container" style="display: none;">
+                <div class="progress-header">
+                    <span>Status: <span id="jobStatus" class="status-badge badge-idle">Idle</span></span>
+                    <span id="percentText">0%</span>
+                </div>
+                <div class="progress-bar-bg">
+                    <div id="progressBar" class="progress-bar-fill"></div>
+                </div>
+                <div class="progress-details">
+                    <span>Processed: <strong id="processedCount">0</strong> / <strong id="totalCount">0</strong></span>
+                    <span>Success: <strong style="color: #16a34a;" id="successCount">0</strong> | Failed: <strong style="color: #dc2626;" id="failedCount">0</strong></span>
+                </div>
+                
+                <div id="lastErrorAlert" style="display: none; background-color: #fee2e2; border: 1px solid #fca5a5; color: #991b1b; padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.8rem; margin-top: 1rem;">
+                    <strong>Last Error:</strong> <span id="lastErrorText"></span>
+                </div>
+
+                <form id="cancelForm" method="POST" action="/admin/llm/cancel" style="margin-top: 1rem; max-width: 100%;">
+                    <button type="submit" class="ai-btn ai-btn-danger" style="width: 100%;">Cancel Enrichment</button>
+                </form>
+            </div>
+            
+            <div id="logBox" class="log-box" style="display: none;">
+                Waiting for worker...
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const testBtn = document.getElementById('testBtn');
+    const testResult = document.getElementById('testResult');
+    const configForm = document.getElementById('configForm');
+
+    // Test connection click handler
+    testBtn.addEventListener('click', async () => {
+        testResult.style.display = 'none';
+        testResult.className = 'toast';
+        testBtn.disabled = true;
+        testBtn.textContent = 'Testing...';
+
+        const formData = new FormData(configForm);
+        
+        try {
+            const response = await fetch('/admin/llm/test', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+            
+            testResult.style.display = 'block';
+            testResult.textContent = data.message;
+            if (data.success) {
+                testResult.classList.add('toast-success');
+            } else {
+                testResult.classList.add('toast-error');
+            }
+        } catch (error) {
+            testResult.style.display = 'block';
+            testResult.classList.add('toast-error');
+            testResult.textContent = 'Request failed: ' + error;
+        } finally {
+            testBtn.disabled = false;
+            testBtn.textContent = 'Test Connection';
+        }
+    });
+
+    // Real-time status polling
+    const progressUi = document.getElementById('progressUi');
+    const jobStatus = document.getElementById('jobStatus');
+    const percentText = document.getElementById('percentText');
+    const progressBar = document.getElementById('progressBar');
+    const processedCount = document.getElementById('processedCount');
+    const totalCount = document.getElementById('totalCount');
+    const successCount = document.getElementById('successCount');
+    const failedCount = document.getElementById('failedCount');
+    const enrichSubmitBtn = document.getElementById('enrichSubmitBtn');
+    const logBox = document.getElementById('logBox');
+    const lastErrorAlert = document.getElementById('lastErrorAlert');
+    const lastErrorText = document.getElementById('lastErrorText');
+
+    let pollInterval = null;
+
+    async function pollStatus() {
+        try {
+            const response = await fetch('/admin/llm/status');
+            const status = await response.json();
+            
+            if (status.running) {
+                progressUi.style.display = 'block';
+                logBox.style.display = 'block';
+                enrichSubmitBtn.disabled = true;
+                enrichSubmitBtn.textContent = '⏳ Processing Feed...';
+                
+                jobStatus.textContent = 'Running';
+                jobStatus.className = 'status-badge badge-running';
+
+                const total = status.total || 0;
+                const processed = status.processed || 0;
+                const success = status.success || 0;
+                const failed = status.failed || 0;
+                const lastError = status.last_error;
+
+                totalCount.textContent = total;
+                processedCount.textContent = processed;
+                successCount.textContent = success;
+                failedCount.textContent = failed;
+
+                const percent = total > 0 ? Math.round((processed / total) * 100) : 0;
+                percentText.textContent = percent + '%';
+                progressBar.style.width = percent + '%';
+
+                if (lastError) {
+                    lastErrorAlert.style.display = 'block';
+                    lastErrorText.textContent = lastError;
+                } else {
+                    lastErrorAlert.style.display = 'none';
+                }
+
+                logBox.textContent = `[Worker Log] Processed ${processed}/${total} items (Success: ${success}, Failed: ${failed})...`;
+                logBox.scrollTop = logBox.scrollHeight;
+            } else {
+                // Not running
+                if (pollInterval) {
+                    // Just finished running or idle
+                    jobStatus.textContent = 'Idle';
+                    jobStatus.className = 'status-badge badge-idle';
+                    enrichSubmitBtn.disabled = false;
+                    enrichSubmitBtn.textContent = '🚀 Start AI Enrichment';
+                    
+                    // If we just completed, reload stats
+                    if (status.processed > 0 && status.processed === status.total) {
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1500);
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Failed to poll LLM status:', error);
+        }
+    }
+
+    // Start polling on page load
+    pollStatus();
+    pollInterval = setInterval(pollStatus, 1500);
+</script>
+{% endblock %}

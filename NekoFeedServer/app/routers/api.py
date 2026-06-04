@@ -42,7 +42,15 @@ def get_feed(
              "item_type": item.item_type,
              "card_type": item.card_type,
              "tags": item.tags.split(',') if item.tags else [],
-             "published_at": item.published_at
+             "published_at": item.published_at,
+             "brand": item.brand,
+             "cta_text": item.cta_text,
+             "price_text": item.price_text,
+             "is_sponsored": item.is_sponsored or False,
+             "ai_summary": item.ai_summary,
+             "ai_tags": item.ai_tags.split(',') if item.ai_tags else [],
+             "ai_reason": item.ai_reason,
+             "ai_enriched": item.ai_enriched or False,
         }
         
         # Resolve Image URL
