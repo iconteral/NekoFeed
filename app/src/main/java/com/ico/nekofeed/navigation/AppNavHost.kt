@@ -32,6 +32,7 @@ import com.ico.nekofeed.ui.feed.FeedScreen
 import com.ico.nekofeed.ui.feed.FeedViewModel
 import com.ico.nekofeed.ui.interaction.InteractionType
 import com.ico.nekofeed.ui.interaction.UserInteractionScreen
+import com.ico.nekofeed.ui.onboarding.OnboardingScreen
 import com.ico.nekofeed.ui.profile.ProfileScreen
 import com.ico.nekofeed.ui.search.SearchScreen
 import com.ico.nekofeed.ui.search.SearchViewModel
@@ -43,6 +44,7 @@ fun AppNavHost(
     authRepository: AuthRepository,
     userRepository: UserRepository,
     restartApp: () -> Unit,
+    startDestination: String = "main",
     navController: NavHostController = rememberNavController()
 ) {
     val feedViewModel: FeedViewModel = viewModel()
@@ -51,8 +53,19 @@ fun AppNavHost(
 
     NavHost(
         navController = navController,
-        startDestination = "main"
+        startDestination = startDestination
     ) {
+        // Onboarding
+        composable("onboarding") {
+            OnboardingScreen(
+                onComplete = {
+                    navController.navigate("main") {
+                        popUpTo("onboarding") { inclusive = true }
+                    }
+                }
+            )
+        }
+
         // Login
         composable("login") {
             LoginScreen(

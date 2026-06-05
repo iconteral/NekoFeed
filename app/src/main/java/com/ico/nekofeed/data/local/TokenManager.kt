@@ -38,6 +38,8 @@ class TokenManager(private val context: Context) {
         private val LLM_API_KEY_KEY = stringPreferencesKey("llm_api_key")
         private val AI_ENABLED_KEY = booleanPreferencesKey("ai_enabled")
         private val SMART_SEARCH_ENABLED_KEY = booleanPreferencesKey("smart_search_enabled")
+        private val ONBOARDING_COMPLETED_KEY = booleanPreferencesKey("onboarding_completed")
+        private val USE_MOCK_MODE_KEY = booleanPreferencesKey("use_mock_mode")
 
         const val DEFAULT_SERVER_BASE_URL = "http://10.0.2.2:8000"
     }
@@ -123,5 +125,33 @@ class TokenManager(private val context: Context) {
         val newId = UUID.randomUUID().toString()
         context.dataStore.edit { it[DEVICE_ID_KEY] = newId }
         return newId
+    }
+
+    val onboardingCompleted: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[ONBOARDING_COMPLETED_KEY] ?: false
+    }
+
+    val useMockMode: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[USE_MOCK_MODE_KEY] ?: false
+    }
+
+    suspend fun setOnboardingCompleted(completed: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[ONBOARDING_COMPLETED_KEY] = completed
+        }
+    }
+
+    suspend fun setMockMode(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[USE_MOCK_MODE_KEY] = enabled
+        }
+    }
+
+    suspend fun isOnboardingCompleted(): Boolean {
+        return context.dataStore.data.first()[ONBOARDING_COMPLETED_KEY] ?: false
+    }
+
+    suspend fun isMockMode(): Boolean {
+        return context.dataStore.data.first()[USE_MOCK_MODE_KEY] ?: false
     }
 }

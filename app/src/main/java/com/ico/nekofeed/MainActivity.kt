@@ -25,12 +25,14 @@ class MainActivity : ComponentActivity() {
         val tokenManager = TokenManager(applicationContext)
         val cachedToken = AtomicReference<String?>(null)
         val cachedDeviceId = AtomicReference<String?>(null)
+        val cachedOnboardingCompleted = AtomicReference<Boolean>(false)
 
         // 恢复自定义 server endpoint 和 deviceId
         runBlocking {
             val serverConfig = tokenManager.getServerConfig()
             RetrofitClient.updateBaseUrl(serverConfig.baseUrl)
             cachedDeviceId.set(tokenManager.getDeviceId())
+            cachedOnboardingCompleted.set(tokenManager.isOnboardingCompleted())
         }
 
         // tokenProvider 在 OkHttp 线程上调用，AtomicReference 保证可见性
@@ -66,13 +68,15 @@ class MainActivity : ComponentActivity() {
         runBlocking { authRepository.restoreToken() }
 
         val userRepository = UserRepository(RetrofitClient.feedApi)
+        val startDestination = if (cachedOnboardingCompleted.get()) "main" else "onboarding"
 
         setContent {
             NekoFeedTheme {
                 AppNavHost(
                     authRepository = authRepository,
                     userRepository = userRepository,
-                    restartApp = restartApp
+                    restartApp = restartApp,
+                    startDestination = startDestination
                 )
             }
         }

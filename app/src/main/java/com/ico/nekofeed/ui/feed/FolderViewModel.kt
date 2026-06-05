@@ -23,9 +23,9 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 
 class FeedViewModel(application: Application) : AndroidViewModel(application) {
-    private val repository = FeedRepository(RetrofitClient.feedApi)
-    private val userRepository = UserRepository(RetrofitClient.feedApi)
     private val tokenManager = TokenManager(application)
+    private val repository = FeedRepository(RetrofitClient.feedApi, tokenManager)
+    private val userRepository = UserRepository(RetrofitClient.feedApi)
     private val database = NekoFeedDatabase.getInstance(application)
     val aiRepository = AiRepository(tokenManager, database.aiCacheDao())
     private val userProfileRepository = UserProfileRepository(database.userProfileDao())
