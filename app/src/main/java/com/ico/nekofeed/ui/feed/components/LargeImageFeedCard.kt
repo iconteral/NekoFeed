@@ -43,6 +43,7 @@ import coil.compose.AsyncImage
 import com.ico.nekofeed.data.model.FeedItem
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LinearWavyProgressIndicator
+import androidx.compose.ui.tooling.preview.Preview
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -314,3 +315,51 @@ private fun formatCount(count: Int): String {
 }
 
 private fun Float.format(digits: Int) = "%.${digits}f".format(this)
+
+@Preview(showBackground = true, widthDp = 380)
+@Composable
+private fun LargeImageFeedCardPreview() {
+    val sampleItem = FeedItem(
+        id = "1",
+        title = "探索未来：2024年AI技术趋势深度解析与行业展望",
+        summary = "人工智能正在以前所未有的速度改变我们的生活和工作方式。",
+        content = null,
+        sourceName = "科技日报",
+        sourceUrl = null,
+        category = null,
+        itemType = "article",
+        cardType = "large_image",
+        imageUrl = null,
+        mediaUrl = null,
+        tags = listOf("AI", "科技", "趋势"),
+        aiSummary = "2024年AI发展呈现多模态融合、边缘计算普及、行业垂直深耕三大趋势。",
+        aiTags = listOf("AI", "多模态", "边缘计算"),
+        isLiked = true,
+        likeCount = 2356,
+        isCollected = false,
+        collectCount = 189,
+        publishedAt = "2024-01-15"
+    )
+
+    MaterialTheme {
+        Column {
+            LargeImageFeedCard(item = sampleItem)
+            LargeImageFeedCard(
+                item = sampleItem.copy(
+                    id = "2",
+                    title = "Jetpack Compose 最新特性速览",
+                    aiSummary = null,
+                    aiTags = emptyList(),
+                    isLiked = false,
+                    likeCount = 88,
+                    isCollected = true,
+                    collectCount = 456,
+                    imageUrl = "https://example.com/image.jpg",
+                    brand = "Google",
+                    isSponsored = true
+                ),
+                isAiEnabled = false
+            )
+        }
+    }
+}

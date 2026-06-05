@@ -259,6 +259,23 @@ private fun MainScreen(
                     onItemClick = { itemId ->
                         val encodedId = Uri.encode(itemId)
                         nestedNavController.navigate("detail/$encodedId")
+                    },
+                    onLikeClick = { itemId ->
+                        if (authState.isLoggedIn) {
+                            feedViewModel.toggleLike(itemId)
+                        } else {
+                            navigateToLogin()
+                        }
+                    },
+                    onCollectClick = { itemId ->
+                        if (authState.isLoggedIn) {
+                            feedViewModel.toggleCollect(itemId)
+                        } else {
+                            navigateToLogin()
+                        }
+                    },
+                    onShareClick = { itemId ->
+                        feedViewModel.toggleShare(itemId)
                     }
                 )
             }

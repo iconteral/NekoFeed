@@ -65,7 +65,7 @@ import com.ico.nekofeed.util.FeedUiState
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.debounce
-
+import androidx.compose.ui.unit.sp
 private val NotoEmojiFont = FontFamily(Font(resId = R.font.noto_emoji_regular))
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -150,22 +150,30 @@ fun FeedScreenContent(
                     Box(
                         modifier = Modifier
                             .size(28.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(
-                                Brush.linearGradient(
-                                    colors = listOf(
-                                        MaterialTheme.colorScheme.primary,
-                                        MaterialTheme.colorScheme.secondary
-                                    )
-                                )
-                            ),
+                            .clip(RoundedCornerShape(8.dp)),
+//                            .background(
+//                                Brush.linearGradient(
+//                                    colors = listOf(
+//                                        MaterialTheme.colorScheme.primary,
+//                                        MaterialTheme.colorScheme.secondary
+//                                    )
+//                                )
+//                            ),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.Star,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(14.dp)
+//                        Icon(
+//                            imageVector = Icons.Filled.Star,
+//                            contentDescription = null,
+//                            tint = Color.White,
+//                            modifier = Modifier.size(14.dp)
+//                        )
+                        Text(
+                            text = "\uD83D\uDC31",
+                            fontSize = 25.sp,
+//                            fontFamily = NotoEmojiFont,
+//                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+//                            modifier = Modifier.
+//                            padding()
                         )
                     }
                     Spacer(modifier = Modifier.width(8.dp))
@@ -253,7 +261,6 @@ fun FeedScreenContent(
                     fontSize = MaterialTheme.typography.titleLarge.fontSize,
                     fontFamily = NotoEmojiFont,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
-
                 )
             }
         }

@@ -39,6 +39,7 @@ import coil.compose.AsyncImage
 import com.ico.nekofeed.data.model.FeedItem
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LinearWavyProgressIndicator
+import androidx.compose.ui.tooling.preview.Preview
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -83,7 +84,13 @@ fun SmallImageFeedCard(
                         // AI 摘要
                         Row(
                             verticalAlignment = Alignment.Top,
-                            modifier = Modifier.padding(bottom = 8.dp)
+                            modifier = Modifier.padding(bottom = 4.dp)
+                            .fillMaxWidth()
+                            .background(
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.52f),
+                                RoundedCornerShape(10.dp)
+                            )
+                            .padding(4.dp, 6.dp),
                         ) {
                             Text(
                                 text = "✨",
@@ -220,7 +227,7 @@ fun SmallImageFeedCard(
         // 右侧缩略图
         Box(
             modifier = Modifier
-                .size(88.dp)
+                .size(91.dp)
                 .clip(RoundedCornerShape(10.dp))
         ) {
             if (item.imageUrl != null) {
@@ -228,13 +235,13 @@ fun SmallImageFeedCard(
                     model = item.imageUrl,
                     contentDescription = item.title,
                     modifier = Modifier
-                        .size(88.dp),
+                        .size(92.dp),
                     contentScale = ContentScale.Crop
                 )
             } else {
                 Box(
                     modifier = Modifier
-                        .size(88.dp)
+                        .size(92.dp)
                         .background(MaterialTheme.colorScheme.surfaceVariant),
                     contentAlignment = Alignment.Center
                 ) {
@@ -257,3 +264,50 @@ private fun formatCount(count: Int): String {
 }
 
 private fun Float.format(digits: Int) = "%.${digits}f".format(this)
+
+@Preview(showBackground = true, widthDp = 380)
+@Composable
+private fun SmallImageFeedCardPreview() {
+    val sampleItem = FeedItem(
+        id = "1",
+        title = "2024年度最值得关注的AI技术趋势与前沿应用探索",
+        summary = "深度学习领域正在经历快速变革，大语言模型和多模态技术带来了全新的可能性。",
+        content = null,
+        sourceName = "36氪",
+        sourceUrl = null,
+        category = null,
+        itemType = "article",
+        cardType = "small_image",
+        imageUrl = null,
+        mediaUrl = null,
+        tags = listOf("AI", "深度学习"),
+        aiSummary = "AI技术在2024年迎来重大突破，多模态模型成为主流趋势。",
+        aiTags = listOf("AI", "技术", "深度学习"),
+        isLiked = true,
+        likeCount = 1280,
+        isCollected = false,
+        collectCount = 56,
+        publishedAt = "2024-01-15"
+    )
+
+    MaterialTheme {
+        Column {
+            SmallImageFeedCard(item = sampleItem)
+            SmallImageFeedCard(
+                item = sampleItem.copy(
+                    id = "2",
+                    title = "Kotlin 2.0 发布：全新 K2 编译器性能提升显著",
+                    aiSummary = null,
+                    aiTags = emptyList(),
+                    isLiked = false,
+                    likeCount = 42,
+                    isCollected = true,
+                    collectCount = 99,
+                    imageUrl = "https://example.com/image.jpg"
+                ),
+                isAiEnabled = false
+            )
+        }
+    }
+}
+

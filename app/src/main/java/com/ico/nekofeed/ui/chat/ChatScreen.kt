@@ -1,9 +1,8 @@
 package com.ico.nekofeed.ui.chat
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
-import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -77,11 +76,20 @@ import com.ico.nekofeed.util.ChatBubble
 fun ChatScreen(
     chatViewModel: ChatViewModel,
     allItems: List<FeedItem>,
-    onItemClick: (String) -> Unit
+    onItemClick: (String) -> Unit,
+    onLikeClick: (String) -> Unit = {},
+    onCollectClick: (String) -> Unit = {},
+    onShareClick: (String) -> Unit = {}
 ) {
     val uiState by chatViewModel.uiState.collectAsState()
     var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
+
+    LaunchedEffect(allItems) {
+        if (allItems.isNotEmpty()) {
+            chatViewModel.loadHistory(allItems)
+        }
+    }
 
     LaunchedEffect(uiState.messages.size) {
         if (uiState.messages.isNotEmpty()) {
@@ -137,22 +145,30 @@ fun ChatScreen(
                 }
             }
 
-            items(uiState.messages) { bubble ->
+            items(
+                items = uiState.messages,
+                key = { it.id }
+            ) { bubble ->
                 ChatBubbleItem(
                     bubble = bubble,
-                    onItemClick = onItemClick
+                    onItemClick = onItemClick,
+                    onLikeClick = onLikeClick,
+                    onCollectClick = onCollectClick,
+                    onShareClick = onShareClick
                 )
             }
 
             if (uiState.isAiTyping) {
-                item {
+                item(key = "typing_indicator") {
                     TypingIndicator()
                 }
             }
 
             if (uiState.errorMessage != null) {
-                item {
-                    ErrorMessage(uiState.errorMessage!!)
+                item(key = "error_message") {
+                    uiState.errorMessage?.let { message ->
+                        ErrorMessage(message)
+                    }
                 }
             }
 
@@ -231,7 +247,10 @@ private fun WelcomeMessage() {
 @Composable
 private fun ChatBubbleItem(
     bubble: ChatBubble,
-    onItemClick: (String) -> Unit
+    onItemClick: (String) -> Unit,
+    onLikeClick: (String) -> Unit = {},
+    onCollectClick: (String) -> Unit = {},
+    onShareClick: (String) -> Unit = {}
 ) {
     val isUser = bubble.role == "user"
 
@@ -308,6 +327,9 @@ private fun ChatBubbleItem(
                             FeedItemCard(
                                 item = item,
                                 onClick = { onItemClick(item.id) },
+                                onLikeClick = onLikeClick,
+                                onCollectClick = onCollectClick,
+                                onShareClick = onShareClick,
                                 isAiEnabled = false,
                                 modifier = Modifier.padding(vertical = 4.dp)
                             )
@@ -325,38 +347,43 @@ private fun ChatBubbleItem(
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun TypingIndicator() {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.Start
+    AnimatedVisibility(
+        visible = true,
+        enter = fadeIn(animationSpec = tween(200))
     ) {
-        Icon(
-            imageVector = Icons.Default.SmartToy,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier
-                .size(28.dp)
-                .padding(top = 4.dp)
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Card(
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-            )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Start
         ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    text = "Neko 正在思考...",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+            Icon(
+                imageVector = Icons.Default.SmartToy,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .size(28.dp)
+                    .padding(top = 4.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-                LinearWavyProgressIndicator(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(4.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-                )
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        text = "Neko 正在思考...",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    LinearWavyProgressIndicator(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(4.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                    )
+                }
             }
         }
     }
@@ -364,19 +391,24 @@ private fun TypingIndicator() {
 
 @Composable
 private fun ErrorMessage(message: String) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
-        )
+    AnimatedVisibility(
+        visible = true,
+        enter = fadeIn(animationSpec = tween(200))
     ) {
-        SelectionContainer {
-            Text(
-                text = message,
-                modifier = Modifier.padding(12.dp),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.error
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
             )
+        ) {
+            SelectionContainer {
+                Text(
+                    text = message,
+                    modifier = Modifier.padding(12.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
         }
     }
 }

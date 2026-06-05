@@ -31,9 +31,56 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
     private val conversationHistory = mutableListOf<ChatMessage>()
+    private var isHistoryLoaded = false
 
-    init {
-        loadHistory()
+    fun loadHistory(allItems: List<FeedItem>) {
+        if (isHistoryLoaded) return
+        isHistoryLoaded = true
+
+        viewModelScope.launch {
+            val entities = chatMessageDao.getAllMessages()
+            if (entities.isEmpty()) return@launch
+
+            val bubbles = mutableListOf<ChatBubble>()
+            for (entity in entities) {
+                val recommendedIds = if (entity.recommendedIds != null) {
+                    try {
+                        val listType = object : TypeToken<List<String>>() {}.type
+                        gson.fromJson(entity.recommendedIds, listType) ?: emptyList()
+                    } catch (e: Exception) {
+                        emptyList<String>()
+                    }
+                } else {
+                    emptyList()
+                }
+
+                val recommendedItems = if (recommendedIds.isNotEmpty()) {
+                    allItems.filter { item -> item.id in recommendedIds }
+                } else {
+                    emptyList()
+                }
+
+                val cleanContent = removeRecommendedIdsJson(entity.content)
+
+                bubbles.add(
+                    ChatBubble(
+                        id = entity.id,
+                        role = entity.role,
+                        content = cleanContent,
+                        recommendedItems = recommendedItems,
+                        timestamp = entity.timestamp
+                    )
+                )
+
+                if (entity.role == "user") {
+                    conversationHistory.add(ChatMessage("user", entity.content))
+                } else {
+                    conversationHistory.add(ChatMessage("assistant", entity.content))
+                }
+            }
+
+            _uiState.value = _uiState.value.copy(messages = bubbles)
+        }
     }
 
     fun sendMessage(text: String, allItems: List<FeedItem>) {
@@ -41,6 +88,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             val userBubble = ChatBubble(
+                id = System.nanoTime(),
                 role = "user",
                 content = text,
                 timestamp = System.currentTimeMillis()
@@ -78,6 +126,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 val cleanContent = removeRecommendedIdsJson(response)
 
                 val assistantBubble = ChatBubble(
+                    id = System.nanoTime(),
                     role = "assistant",
                     content = cleanContent,
                     recommendedItems = recommendedItems,
@@ -110,45 +159,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             chatMessageDao.clearAll()
             conversationHistory.clear()
+            isHistoryLoaded = false
             _uiState.value = ChatUiState()
-        }
-    }
-
-    private fun loadHistory() {
-        viewModelScope.launch {
-            val entities = chatMessageDao.getAllMessages()
-            if (entities.isEmpty()) return@launch
-
-            val bubbles = mutableListOf<ChatBubble>()
-            for (entity in entities) {
-                val recommendedIds = if (entity.recommendedIds != null) {
-                    try {
-                        val listType = object : TypeToken<List<String>>() {}.type
-                        gson.fromJson(entity.recommendedIds, listType) ?: emptyList()
-                    } catch (e: Exception) {
-                        emptyList<String>()
-                    }
-                } else {
-                    emptyList()
-                }
-
-                bubbles.add(
-                    ChatBubble(
-                        id = entity.id,
-                        role = entity.role,
-                        content = entity.content,
-                        timestamp = entity.timestamp
-                    )
-                )
-
-                if (entity.role == "user") {
-                    conversationHistory.add(ChatMessage("user", entity.content))
-                } else {
-                    conversationHistory.add(ChatMessage("assistant", entity.content))
-                }
-            }
-
-            _uiState.value = _uiState.value.copy(messages = bubbles)
         }
     }
 
@@ -186,7 +198,6 @@ $feedSummary
 
     private fun parseRecommendedIds(response: String): List<String> {
         return try {
-            // Try to find the JSON block — handle multi-line with DOTALL flag
             val jsonPattern = """\{"recommended_ids"\s*:\s*\[.*?\]\s*\}""".toRegex(RegexOption.DOT_MATCHES_ALL)
             val match = jsonPattern.find(response)
             if (match != null) {
@@ -195,8 +206,6 @@ $feedSummary
                 return map["recommended_ids"] ?: emptyList()
             }
 
-            // Fallback: JSON might be truncated (common with long IDs).
-            // Try to extract individual item IDs using a broader pattern.
             val truncatedPattern = """\{"recommended_ids"\s*:\s*\[(.*)""".toRegex(RegexOption.DOT_MATCHES_ALL)
             val truncatedMatch = truncatedPattern.find(response)
             if (truncatedMatch != null) {
@@ -207,7 +216,6 @@ $feedSummary
 
             emptyList()
         } catch (e: Exception) {
-            // Last resort: try to find any item IDs in the response tail
             try {
                 val idPattern = """"(item_[a-f0-9]+)"""".toRegex()
                 val lastChunk = response.takeLast(500)
@@ -219,18 +227,14 @@ $feedSummary
     }
 
     private fun removeRecommendedIdsJson(response: String): String {
-        // Remove the JSON block (multi-line aware), including potential truncated JSON at the end
         var cleaned = response
 
-        // Try complete JSON first
         val completePattern = """\n?\s*\{"recommended_ids"\s*:\s*\[.*?\]\s*\}""".toRegex(RegexOption.DOT_MATCHES_ALL)
         cleaned = cleaned.replace(completePattern, "")
 
-        // If there's a truncated JSON at the end, remove it too
         val truncatedPattern = """\n?\s*\{"recommended_ids"\s*:\s*\[.*$""".toRegex(RegexOption.DOT_MATCHES_ALL)
         cleaned = cleaned.replace(truncatedPattern, "")
 
         return cleaned.trimEnd()
     }
 }
-
