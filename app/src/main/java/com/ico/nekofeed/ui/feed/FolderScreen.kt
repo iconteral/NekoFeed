@@ -1,9 +1,6 @@
 package com.ico.nekofeed.ui.feed
 
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,10 +20,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Chat
-import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -39,7 +33,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryScrollableTabRow
-import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -49,21 +42,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.ico.nekofeed.R
 import com.ico.nekofeed.data.local.FallbackFeedData
 import com.ico.nekofeed.data.model.FeedCategory
 import com.ico.nekofeed.data.model.FeedItem
@@ -71,6 +63,8 @@ import com.ico.nekofeed.ui.feed.components.FeedItemCard
 import com.ico.nekofeed.util.FeedUiState
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
+
+private val NotoEmojiFont = FontFamily(Font(resId = R.font.noto_emoji_regular))
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -127,8 +121,6 @@ fun FeedScreenContent(
     onPlayingItemChange: (String?) -> Unit
 ) {
     val listState = rememberLazyListState()
-    var fabExpanded by remember { mutableStateOf(false) }
-
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier.fillMaxSize()
@@ -230,93 +222,22 @@ fun FeedScreenContent(
         }
         }
 
-        // FAB 浮动菜单
-        Column(
-            horizontalAlignment = Alignment.End,
+        // FAB
+        Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(16.dp)
         ) {
-            androidx.compose.animation.AnimatedVisibility(
-                visible = fabExpanded,
-                enter = fadeIn() + slideInVertically(
-                    initialOffsetY = { it },
-                    animationSpec = spring(dampingRatio = 0.6f)
-                ),
-                exit = fadeOut()
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.End,
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.padding(bottom = 16.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = "设置",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        SmallFloatingActionButton(
-                            onClick = {
-                                fabExpanded = false
-                                onAiSettingsClick()
-                            },
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer
-                        ) {
-                            Icon(Icons.Filled.Settings, contentDescription = "AI 设置")
-                        }
-                    }
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = "数据统计",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        SmallFloatingActionButton(
-                            onClick = {
-                                fabExpanded = false
-                                onStatsClick()
-                            },
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer
-                        ) {
-                            Icon(Icons.Filled.BarChart, contentDescription = "数据统计")
-                        }
-                    }
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = "AI 搜索",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        SmallFloatingActionButton(
-                            onClick = {
-                                fabExpanded = false
-                                onSearchClick()
-                            },
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer
-                        ) {
-                            Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "AI 搜索")
-                        }
-                    }
-                }
-            }
             FloatingActionButton(
-                onClick = { fabExpanded = !fabExpanded },
+                onClick = { onSearchClick() },
                 containerColor = MaterialTheme.colorScheme.primaryContainer
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Star,
-                    contentDescription = "AI 助手",
-//                    modifier = Modifier.rotate(if (fabExpanded) 45f else 0f)
+                Text(
+                    text = "✨",
+                    fontSize = MaterialTheme.typography.titleLarge.fontSize,
+                    fontFamily = NotoEmojiFont,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+
                 )
             }
         }
@@ -389,7 +310,7 @@ private fun AISearchBar(onClick: () -> Unit) {
                 modifier = Modifier.size(16.dp)
             )
             Text(
-                text = "告诉 AI 你想看什么广告...",
+                text = "告诉 AI 你想看什么内容...",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary
             )

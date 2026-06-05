@@ -158,7 +158,7 @@ fun StatsScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "广告排行榜",
+                        text = "内容排行榜",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )

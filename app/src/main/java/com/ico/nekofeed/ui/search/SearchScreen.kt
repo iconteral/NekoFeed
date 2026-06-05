@@ -209,7 +209,7 @@ private fun SearchInputField(
                 .padding(4.dp),
             placeholder = {
                 Text(
-                    text = "描述你想看的广告内容...",
+                    text = "描述你想看的内容...",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -531,7 +531,7 @@ private fun EmptySearchResult() {
             modifier = Modifier.size(48.dp)
         )
         Text(
-            text = "未找到匹配的广告",
+            text = "未找到匹配的内容",
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface
