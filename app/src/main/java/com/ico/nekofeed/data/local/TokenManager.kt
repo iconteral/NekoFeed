@@ -102,9 +102,10 @@ class TokenManager(private val context: Context) {
         return llmConfig.first()
     }
 
-    suspend fun clearAll() {
+    suspend fun clearAuth() {
         context.dataStore.edit { preferences ->
-            preferences.clear()
+            preferences.remove(TOKEN_KEY)
+            preferences.remove(USERNAME_KEY)
         }
     }
 

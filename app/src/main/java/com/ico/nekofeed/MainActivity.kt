@@ -57,7 +57,7 @@ class MainActivity : ComponentActivity() {
                 isHandling401 = true
                 cachedToken.set(null)
                 runBlocking {
-                    tokenManager.clearAll()
+                    tokenManager.clearAuth()
                 }
                 runOnUiThread { restartApp() }
             }

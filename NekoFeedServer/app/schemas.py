@@ -133,3 +133,63 @@ class ItemInteraction(BaseModel):
     is_collected: bool = False
     like_count: int = 0
     collect_count: int = 0
+
+
+# --- User Profile Analytics Schemas ---
+
+class CategoryStat(BaseModel):
+    category: str
+    count: int
+    percentage: float
+
+class TagStat(BaseModel):
+    tag: str
+    count: int
+
+class ContentTypeStat(BaseModel):
+    item_type: str
+    count: int
+    percentage: float
+
+class DailyActivity(BaseModel):
+    date: str
+    views: int
+    likes: int
+    collects: int
+
+class ReadingPattern(BaseModel):
+    hour: int
+    count: int
+
+class UserInterestProfile(BaseModel):
+    top_categories: List[CategoryStat]
+    top_tags: List[TagStat]
+    content_type_preferences: List[ContentTypeStat]
+    liked_categories: List[CategoryStat]
+    collected_categories: List[CategoryStat]
+
+class UserBehaviorStats(BaseModel):
+    total_reading_time_seconds: int
+    avg_reading_time_seconds: float
+    total_items_viewed: int
+    total_likes: int
+    total_collects: int
+    most_active_hour: Optional[int] = None
+    daily_activities: List[DailyActivity]
+    reading_patterns: List[ReadingPattern]
+
+class UserEngagementMetrics(BaseModel):
+    like_rate: float  # likes / views
+    collect_rate: float  # collects / views
+    avg_daily_views: float
+    most_engaged_category: Optional[str] = None
+    longest_streak_days: int
+
+class UserProfile(BaseModel):
+    user: UserResponse
+    interests: UserInterestProfile
+    behavior: UserBehaviorStats
+    engagement: UserEngagementMetrics
+    recent_likes: List[dict]
+    recent_collects: List[dict]
+    recent_history: List[dict]

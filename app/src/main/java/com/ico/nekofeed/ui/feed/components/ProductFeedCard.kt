@@ -49,7 +49,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.ico.nekofeed.data.model.FeedItem
-import androidx.compose.animation.Crossfade
 import androidx.compose.material3.LinearWavyProgressIndicator
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -161,52 +160,50 @@ fun ProductFeedCard(
                 }
             }
 
-            Crossfade(
-                targetState = item.aiSummary to item.isAiLoading,
-                label = "ai_analysis_transition"
-            ) { (summary, isLoading) ->
-                if (!summary.isNullOrBlank()) {
-                    Column {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(
-                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.12f),
-                                    RoundedCornerShape(10.dp)
-                                )
-                                .padding(10.dp, 12.dp),
-                            verticalAlignment = Alignment.Top
-                        ) {
-                            Text(
-                                text = "✨",
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.padding(end = 8.dp)
+            val summary = item.aiSummary
+            val isLoading = item.isAiLoading
+            if (!summary.isNullOrBlank()) {
+                Column {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.12f),
+                                RoundedCornerShape(10.dp)
                             )
-                            Text(
-                                text = summary,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                lineHeight = MaterialTheme.typography.bodySmall.lineHeight
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(10.dp))
+                            .padding(10.dp, 12.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Text(
+                            text = "✨",
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(end = 8.dp)
+                        )
+                        Text(
+                            text = summary,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = MaterialTheme.typography.bodySmall.lineHeight
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
 
-                        if (item.displayTags.isNotEmpty()) {
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp),
-                                modifier = Modifier.padding(bottom = 14.dp)
-                            ) {
-                                item.displayTags.forEach { tag ->
-                                    FeedTagChip(
-                                        tag = tag,
-                                        onClick = { onTagClick?.invoke(tag) }
-                                    )
-                                }
+                    if (item.displayTags.isNotEmpty()) {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.padding(bottom = 14.dp)
+                        ) {
+                            item.displayTags.forEach { tag ->
+                                FeedTagChip(
+                                    tag = tag,
+                                    onClick = { onTagClick?.invoke(tag) }
+                                )
                             }
                         }
                     }
-                } else if (isAiEnabled && (isLoading || item.aiSummary == null)) {
+                }
+            } else if (isAiEnabled && isLoading) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -248,7 +245,6 @@ fun ProductFeedCard(
                     }
                     Spacer(modifier = Modifier.height(10.dp))
                 }
-            }
 
             // CTA 按钮和互动按钮
             Row(

@@ -29,6 +29,7 @@
             <td>{{ user.history_count }}</td>
             <td>{{ user.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
             <td>
+                <a href="/admin/users/{{ user.id }}/profile" class="btn btn-sm" style="margin-right: 4px;">Profile</a>
                 <form method="post" action="/admin/users/{{ user.id }}/toggle" style="display:inline;">
                     <button type="submit" class="btn btn-sm">{{ "Disable" if user.is_active else "Enable" }}</button>
                 </form>

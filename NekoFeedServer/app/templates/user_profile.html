@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>User Profile: {{ user.username }}</h1>
+
+<div class="dashboard-stats">
+    <div class="stat-box">
+        <h3>Total Views</h3>
+        <div class="number">{{ behavior.total_items_viewed }}</div>
+    </div>
+    <div class="stat-box">
+        <h3>Total Likes</h3>
+        <div class="number">{{ behavior.total_likes }}</div>
+    </div>
+    <div class="stat-box">
+        <h3>Total Collects</h3>
+        <div class="number">{{ behavior.total_collects }}</div>
+    </div>
+    <div class="stat-box">
+        <h3>Reading Time</h3>
+        <div class="number">{{ (behavior.total_reading_time_seconds / 60)|round(1) }}m</div>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem;">
+    <!-- 兴趣分类饼图 -->
+    <div class="card">
+        <h3>Interest Categories (Views)</h3>
+        <canvas id="categoryChart" height="250"></canvas>
+    </div>
+
+    <!-- 内容类型偏好 -->
+    <div class="card">
+        <h3>Content Type Preferences</h3>
+        <canvas id="typeChart" height="250"></canvas>
+    </div>
+
+    <!-- 24小时阅读分布 -->
+    <div class="card">
+        <h3>Reading Patterns (24h)</h3>
+        <canvas id="hourChart" height="250"></canvas>
+    </div>
+
+    <!-- 参与度指标 -->
+    <div class="card">
+        <h3>Engagement Metrics</h3>
+        <div style="padding: 1rem 0;">
+            <div style="display: flex; justify-content: space-between; padding: 0.8rem 0; border-bottom: 1px solid #eee;">
+                <span>Like Rate</span>
+                <strong>{{ "%.1f"|format(engagement.like_rate * 100) }}%</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 0.8rem 0; border-bottom: 1px solid #eee;">
+                <span>Collect Rate</span>
+                <strong>{{ "%.1f"|format(engagement.collect_rate * 100) }}%</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 0.8rem 0; border-bottom: 1px solid #eee;">
+                <span>Avg Daily Views</span>
+                <strong>{{ engagement.avg_daily_views }}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 0.8rem 0; border-bottom: 1px solid #eee;">
+                <span>Most Engaged Category</span>
+                <strong>{{ engagement.most_engaged_category or "N/A" }}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 0.8rem 0;">
+                <span>Longest Active Streak</span>
+                <strong>{{ engagement.longest_streak_days }} days</strong>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 点赞分类 vs 收藏分类 对比 -->
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem;">
+    <div class="card">
+        <h3>Liked Categories</h3>
+        <canvas id="likedCatChart" height="200"></canvas>
+    </div>
+    <div class="card">
+        <h3>Collected Categories</h3>
+        <canvas id="collectedCatChart" height="200"></canvas>
+    </div>
+</div>
+
+<!-- 标签词云（用简单列表展示） -->
+<div class="card" style="margin-top: 1.5rem;">
+    <h3>Top Tags</h3>
+    <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; padding: 1rem 0;">
+        {% for tag in interests.top_tags[:20] %}
+        <span class="badge" style="font-size: {{ 0.8 + (tag.count / 10)|round(1) }}rem; padding: 4px 12px;">{{ tag.tag }} ({{ tag.count }})</span>
+        {% endfor %}
+        {% if not interests.top_tags %}
+        <span style="color: #999;">No tag data yet</span>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 最近活动 -->
+<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem;">
+    <div class="card">
+        <h3>Recent Likes</h3>
+        {% for item in recent_likes[:5] %}
+        <div style="padding: 0.5rem 0; border-bottom: 1px solid #eee; font-size: 0.9rem;">
+            <div style="font-weight: 500;">{{ item.title[:40] }}{% if item.title|length > 40 %}...{% endif %}</div>
+            <div style="color: #999; font-size: 0.8rem;">{{ item.category }}</div>
+        </div>
+        {% endfor %}
+        {% if not recent_likes %}
+        <p style="color: #999;">No likes yet</p>
+        {% endif %}
+    </div>
+    <div class="card">
+        <h3>Recent Collects</h3>
+        {% for item in recent_collects[:5] %}
+        <div style="padding: 0.5rem 0; border-bottom: 1px solid #eee; font-size: 0.9rem;">
+            <div style="font-weight: 500;">{{ item.title[:40] }}{% if item.title|length > 40 %}...{% endif %}</div>
+            <div style="color: #999; font-size: 0.8rem;">{{ item.category }}</div>
+        </div>
+        {% endfor %}
+        {% if not recent_collects %}
+        <p style="color: #999;">No collects yet</p>
+        {% endif %}
+    </div>
+    <div class="card">
+        <h3>Recent Views</h3>
+        {% for item in recent_history[:5] %}
+        <div style="padding: 0.5rem 0; border-bottom: 1px solid #eee; font-size: 0.9rem;">
+            <div style="font-weight: 500;">{{ item.title[:40] }}{% if item.title|length > 40 %}...{% endif %}</div>
+            <div style="color: #999; font-size: 0.8rem;">{{ item.category }} · {{ item.duration }}s</div>
+        </div>
+        {% endfor %}
+        {% if not recent_history %}
+        <p style="color: #999;">No views yet</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 每日活动趋势 -->
+{% if behavior.daily_activities %}
+<div class="card" style="margin-top: 1.5rem;">
+    <h3>Daily Activity (Last 30 Days)</h3>
+    <canvas id="dailyChart" height="150"></canvas>
+</div>
+{% endif %}
+
+<div style="margin-top: 1.5rem;">
+    <a href="/admin/users" class="btn">Back to Users</a>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+const COLORS = ['#3498db','#e74c3c','#2ecc71','#f39c12','#9b59b6','#1abc9c','#e67e22','#34495e','#16a085','#c0392b'];
+
+function makePieChart(id, labels, data) {
+    new Chart(document.getElementById(id), {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{ data: data, backgroundColor: COLORS }]
+        },
+        options: { responsive: true, plugins: { legend: { position: 'right' } } }
+    });
+}
+
+function makeBarChart(id, labels, datasets) {
+    new Chart(document.getElementById(id), {
+        type: 'bar',
+        data: { labels: labels, datasets: datasets },
+        options: {
+            responsive: true,
+            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+            plugins: { legend: { display: datasets.length > 1 } }
+        }
+    });
+}
+
+// Category pie
+makePieChart('categoryChart',
+    {{ interests.top_categories|map(attribute='category')|list|tojson }},
+    {{ interests.top_categories|map(attribute='count')|list|tojson }}
+);
+
+// Content type pie
+makePieChart('typeChart',
+    {{ interests.content_type_preferences|map(attribute='item_type')|list|tojson }},
+    {{ interests.content_type_preferences|map(attribute='count')|list|tojson }}
+);
+
+// 24h bar chart
+makeBarChart('hourChart',
+    {{ reading_patterns|map(attribute='hour')|list|tojson }},
+    [{
+        label: 'Views',
+        data: {{ reading_patterns|map(attribute='count')|list|tojson }},
+        backgroundColor: '#3498db'
+    }]
+);
+
+// Liked categories
+makePieChart('likedCatChart',
+    {{ interests.liked_categories|map(attribute='category')|list|tojson }},
+    {{ interests.liked_categories|map(attribute='count')|list|tojson }}
+);
+
+// Collected categories
+makePieChart('collectedCatChart',
+    {{ interests.collected_categories|map(attribute='category')|list|tojson }},
+    {{ interests.collected_categories|map(attribute='count')|list|tojson }}
+);
+
+{% if behavior.daily_activities %}
+// Daily activity line chart
+new Chart(document.getElementById('dailyChart'), {
+    type: 'line',
+    data: {
+        labels: {{ behavior.daily_activities|map(attribute='date')|list|tojson }},
+        datasets: [
+            { label: 'Views', data: {{ behavior.daily_activities|map(attribute='views')|list|tojson }}, borderColor: '#3498db', fill: false },
+            { label: 'Likes', data: {{ behavior.daily_activities|map(attribute='likes')|list|tojson }}, borderColor: '#e74c3c', fill: false },
+            { label: 'Collects', data: {{ behavior.daily_activities|map(attribute='collects')|list|tojson }}, borderColor: '#2ecc71', fill: false }
+        ]
+    },
+    options: { responsive: true, scales: { y: { beginAtZero: true } } }
+});
+{% endif %}
+</script>
+{% endblock %}

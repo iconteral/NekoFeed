@@ -73,7 +73,13 @@ object RetrofitClient {
         private set
 
     private fun buildRetrofit(url: String): Retrofit {
-        val normalizedUrl = if (url.endsWith("/")) url else "$url/"
+        val normalizedUrl = buildString {
+            if (!url.startsWith("http://") && !url.startsWith("https://")) {
+                append("http://")
+            }
+            append(url.trimEnd('/'))
+            append("/")
+        }
         return Retrofit.Builder()
             .baseUrl(normalizedUrl)
             .client(okHttpClient)

@@ -14,8 +14,12 @@ object LlmClientFactory {
             .writeTimeout(timeoutSeconds, TimeUnit.SECONDS)
             .build()
 
-        // 移除末尾的 /v1，因为LlmApi中已包含v1前缀
+        // 自动补全 scheme
         var url = baseUrl.trimEnd('/')
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            url = "http://$url"
+        }
+        // 移除末尾的 /v1，因为LlmApi中已包含v1前缀
         if (url.endsWith("/v1")) {
             url = url.dropLast(3)
         }

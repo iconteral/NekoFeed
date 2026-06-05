@@ -368,6 +368,157 @@ def toggle_user(user_id: int, db: Session = Depends(get_db)):
     return RedirectResponse(url="/admin/users", status_code=303)
 
 
+@router.get("/users/{user_id}/profile", response_class=HTMLResponse)
+def user_profile(request: Request, user_id: int, db: Session = Depends(get_db)):
+    from collections import Counter
+    from datetime import datetime, timedelta
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    likes = db.query(UserLike).filter(UserLike.user_id == user.id).all()
+    collects = db.query(UserCollect).filter(UserCollect.user_id == user.id).all()
+    history = db.query(UserHistory).filter(UserHistory.user_id == user.id).all()
+
+    like_item_ids = [l.item_id for l in likes]
+    collect_item_ids = [c.item_id for c in collects]
+    history_item_ids = [h.item_id for h in history]
+
+    liked_items = {i.id: i for i in db.query(FeedItem).filter(FeedItem.id.in_(like_item_ids)).all()} if like_item_ids else {}
+    collected_items = {i.id: i for i in db.query(FeedItem).filter(FeedItem.id.in_(collect_item_ids)).all()} if collect_item_ids else {}
+    history_items = {i.id: i for i in db.query(FeedItem).filter(FeedItem.id.in_(history_item_ids)).all()} if history_item_ids else {}
+
+    def calc_category_stats(items_dict):
+        counter = Counter()
+        for item in items_dict.values():
+            if item.category:
+                counter[item.category] += 1
+        total = sum(counter.values()) or 1
+        return [{"category": cat, "count": c, "percentage": round(c / total * 100, 1)} for cat, c in counter.most_common(10)]
+
+    all_viewed_categories = Counter()
+    for h in history:
+        item = history_items.get(h.item_id)
+        if item and item.category:
+            all_viewed_categories[item.category] += 1
+    total_views = sum(all_viewed_categories.values()) or 1
+    top_categories = [{"category": cat, "count": c, "percentage": round(c / total_views * 100, 1)} for cat, c in all_viewed_categories.most_common(10)]
+
+    tag_counter = Counter()
+    for h in history:
+        item = history_items.get(h.item_id)
+        if item and item.tags:
+            for tag in item.tags.split(','):
+                tag = tag.strip()
+                if tag:
+                    tag_counter[tag] += 1
+    top_tags = [{"tag": t, "count": c} for t, c in tag_counter.most_common(20)]
+
+    type_counter = Counter()
+    for h in history:
+        item = history_items.get(h.item_id)
+        if item and item.item_type:
+            type_counter[item.item_type] += 1
+    total_type = sum(type_counter.values()) or 1
+    content_type_preferences = [{"item_type": t, "count": c, "percentage": round(c / total_type * 100, 1)} for t, c in type_counter.most_common()]
+
+    liked_categories = calc_category_stats(liked_items)
+    collected_categories = calc_category_stats(collected_items)
+
+    total_reading_time = sum(h.duration or 0 for h in history)
+    avg_reading_time = round(total_reading_time / len(history), 1) if history else 0
+
+    hour_counter = Counter()
+    for h in history:
+        if h.viewed_at:
+            hour_counter[h.viewed_at.hour] += 1
+    reading_patterns = [{"hour": h, "count": hour_counter.get(h, 0)} for h in range(24)]
+
+    like_rate = len(likes) / len(history) if history else 0
+    collect_rate = len(collects) / len(history) if history else 0
+
+    engagement_counter = Counter()
+    for item in liked_items.values():
+        if item.category:
+            engagement_counter[item.category] += 1
+    for item in collected_items.values():
+        if item.category:
+            engagement_counter[item.category] += 1
+    most_engaged_category = engagement_counter.most_common(1)[0][0] if engagement_counter else None
+
+    if history:
+        view_dates = sorted(set(h.viewed_at.date() for h in history if h.viewed_at))
+        max_streak = 1
+        current_streak = 1
+        for i in range(1, len(view_dates)):
+            if (view_dates[i] - view_dates[i - 1]).days == 1:
+                current_streak += 1
+                max_streak = max(max_streak, current_streak)
+            else:
+                current_streak = 1
+    else:
+        max_streak = 0
+
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    recent_history_30 = [h for h in history if h.viewed_at and h.viewed_at >= thirty_days_ago]
+    recent_likes_30 = [l for l in likes if l.created_at and l.created_at >= thirty_days_ago]
+    recent_collects_30 = [c for c in collects if c.created_at and c.created_at >= thirty_days_ago]
+
+    daily_views = Counter()
+    daily_likes = Counter()
+    daily_collects = Counter()
+    for h in recent_history_30:
+        daily_views[h.viewed_at.strftime("%Y-%m-%d")] += 1
+    for l in recent_likes_30:
+        daily_likes[l.created_at.strftime("%Y-%m-%d")] += 1
+    for c in recent_collects_30:
+        daily_collects[c.created_at.strftime("%Y-%m-%d")] += 1
+    all_dates = sorted(set(list(daily_views.keys()) + list(daily_likes.keys()) + list(daily_collects.keys())))
+    daily_activities = [{"date": d, "views": daily_views.get(d, 0), "likes": daily_likes.get(d, 0), "collects": daily_collects.get(d, 0)} for d in all_dates]
+
+    def item_to_dict(item):
+        return {
+            "title": item.title, "category": item.category, "item_type": item.item_type,
+            "tags": item.tags.split(',') if item.tags else [], "duration": 0
+        }
+
+    recent_likes_list = [item_to_dict(liked_items[l.item_id]) for l in sorted(likes, key=lambda x: x.created_at, reverse=True)[:10] if l.item_id in liked_items]
+    recent_collects_list = [item_to_dict(collected_items[c.item_id]) for c in sorted(collects, key=lambda x: x.created_at, reverse=True)[:10] if c.item_id in collected_items]
+    recent_history_list = [{**item_to_dict(history_items[h.item_id]), "duration": h.duration} for h in sorted(history, key=lambda x: x.viewed_at, reverse=True)[:10] if h.item_id in history_items]
+
+    return templates.TemplateResponse(request=request, name="user_profile.html", context={
+        "request": request,
+        "user": user,
+        "interests": {
+            "top_categories": top_categories,
+            "top_tags": top_tags,
+            "content_type_preferences": content_type_preferences,
+            "liked_categories": liked_categories,
+            "collected_categories": collected_categories,
+        },
+        "behavior": {
+            "total_reading_time_seconds": total_reading_time,
+            "avg_reading_time_seconds": avg_reading_time,
+            "total_items_viewed": len(history),
+            "total_likes": len(likes),
+            "total_collects": len(collects),
+        },
+        "engagement": {
+            "like_rate": round(like_rate, 3),
+            "collect_rate": round(collect_rate, 3),
+            "avg_daily_views": round(len(history) / 30, 1),
+            "most_engaged_category": most_engaged_category,
+            "longest_streak_days": max_streak,
+        },
+        "reading_patterns": reading_patterns,
+        "daily_activities": daily_activities,
+        "recent_likes": recent_likes_list,
+        "recent_collects": recent_collects_list,
+        "recent_history": recent_history_list,
+    })
+
+
 # ===== LLM Enrichment Routes =====
 
 from app.database import SessionLocal

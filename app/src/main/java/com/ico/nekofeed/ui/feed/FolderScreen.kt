@@ -42,6 +42,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,6 +64,7 @@ import com.ico.nekofeed.ui.feed.components.FeedItemCard
 import com.ico.nekofeed.util.FeedUiState
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.debounce
 
 private val NotoEmojiFont = FontFamily(Font(resId = R.font.noto_emoji_regular))
 
@@ -369,7 +371,8 @@ private fun FeedContent(
             }
     }
 
-    // Auto-play detection: find the item closest to center
+    // Auto-play detection: find the item closest to center, with debounce
+    @OptIn(kotlinx.coroutines.FlowPreview::class)
     LaunchedEffect(listState) {
         snapshotFlow {
             val layoutInfo = listState.layoutInfo
@@ -389,6 +392,7 @@ private fun FeedContent(
             closestItem?.key as? String
         }
         .distinctUntilChanged()
+        .debounce(500L)
         .collect { itemId ->
             onPlayingItemChange(itemId)
         }
@@ -410,15 +414,48 @@ private fun FeedContent(
         }
     }
 
-    // Exposure tracking: detect visible items
+    // Exposure tracking: detect visible items for exposure count
+    @OptIn(kotlinx.coroutines.FlowPreview::class)
     LaunchedEffect(listState) {
         snapshotFlow {
             listState.layoutInfo.visibleItemsInfo.mapNotNull { it.key as? String }
         }
             .distinctUntilChanged()
+            .debounce(300L)
             .collect { visibleIds ->
                 visibleIds.forEach { id ->
                     onExposure(id)
+                }
+            }
+    }
+
+    // AI request: only for the focused item (closest to center), with debounce
+    val itemMap = remember(items) { items.associateBy { it.id } }
+    @OptIn(kotlinx.coroutines.FlowPreview::class)
+    LaunchedEffect(listState, isAiEnabled) {
+        if (!isAiEnabled) return@LaunchedEffect
+        snapshotFlow {
+            val layoutInfo = listState.layoutInfo
+            val center = (layoutInfo.viewportEndOffset + layoutInfo.viewportStartOffset) / 2
+            var closestItem: androidx.compose.foundation.lazy.LazyListItemInfo? = null
+            var minDistance = Int.MAX_VALUE
+            for (itemInfo in layoutInfo.visibleItemsInfo) {
+                val itemCenter = itemInfo.offset + itemInfo.size / 2
+                val distance = kotlin.math.abs(itemCenter - center)
+                if (distance < minDistance) {
+                    minDistance = distance
+                    closestItem = itemInfo
+                }
+            }
+            closestItem?.key as? String
+        }
+            .distinctUntilChanged()
+            .debounce(800L)
+            .collect { focusedId ->
+                focusedId?.let { id ->
+                    itemMap[id]?.let { item ->
+                        onAiRequest(item)
+                    }
                 }
             }
     }
@@ -453,14 +490,9 @@ private fun FeedContent(
         // Feed 卡片列表
         items(
             items = items,
-            key = { it.id }
+            key = { it.id },
+            contentType = { it.cardType ?: "large_image" }
         ) { item ->
-            LaunchedEffect(item.id, isAiEnabled) {
-                if (isAiEnabled) {
-                    onAiRequest(item)
-                }
-            }
-
             FeedItemCard(
                 item = item,
                 onClick = { onItemClick(item.id) },

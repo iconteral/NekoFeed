@@ -1,10 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import func, extract
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
+from collections import Counter
 from app.database import get_db
 from app.models import User, FeedItem, UserLike, UserCollect, UserHistory
-from app.schemas import ItemInteraction, FeedItemResponse
+from app.schemas import (
+    ItemInteraction, FeedItemResponse, UserProfile, UserResponse,
+    UserInterestProfile, UserBehaviorStats, UserEngagementMetrics,
+    CategoryStat, TagStat, ContentTypeStat, DailyActivity, ReadingPattern
+)
 from app.auth import get_current_user, get_optional_user, get_or_create_device_user
 
 router = APIRouter(prefix="/api")
@@ -236,6 +242,196 @@ def clear_user_history(
     return {"message": "History cleared"}
 
 
+@router.get("/user/profile", response_model=UserProfile)
+def get_user_profile(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # 1. 基础互动数据
+    likes = db.query(UserLike).filter(UserLike.user_id == current_user.id).all()
+    collects = db.query(UserCollect).filter(UserCollect.user_id == current_user.id).all()
+    history = db.query(UserHistory).filter(UserHistory.user_id == current_user.id).all()
+
+    like_item_ids = [l.item_id for l in likes]
+    collect_item_ids = [c.item_id for c in collects]
+    history_item_ids = [h.item_id for h in history]
+
+    # 2. 获取关联的 FeedItem
+    liked_items = {i.id: i for i in db.query(FeedItem).filter(FeedItem.id.in_(like_item_ids)).all()} if like_item_ids else {}
+    collected_items = {i.id: i for i in db.query(FeedItem).filter(FeedItem.id.in_(collect_item_ids)).all()} if collect_item_ids else {}
+    history_items = {i.id: i for i in db.query(FeedItem).filter(FeedItem.id.in_(history_item_ids)).all()} if history_item_ids else {}
+
+    # 3. 兴趣画像 - 分类统计
+    def _calc_category_stats(items_dict, count):
+        counter = Counter()
+        for item in items_dict.values():
+            if item.category:
+                counter[item.category] += 1
+        total = sum(counter.values()) or 1
+        return [
+            CategoryStat(category=cat, count=c, percentage=round(c / total * 100, 1))
+            for cat, c in counter.most_common(10)
+        ]
+
+    all_viewed_categories = Counter()
+    for h in history:
+        item = history_items.get(h.item_id)
+        if item and item.category:
+            all_viewed_categories[item.category] += 1
+
+    total_views = sum(all_viewed_categories.values()) or 1
+    top_categories = [
+        CategoryStat(category=cat, count=c, percentage=round(c / total_views * 100, 1))
+        for cat, c in all_viewed_categories.most_common(10)
+    ]
+
+    # 4. 标签统计
+    tag_counter = Counter()
+    for h in history:
+        item = history_items.get(h.item_id)
+        if item and item.tags:
+            for tag in item.tags.split(','):
+                tag = tag.strip()
+                if tag:
+                    tag_counter[tag] += 1
+    top_tags = [TagStat(tag=t, count=c) for t, c in tag_counter.most_common(20)]
+
+    # 5. 内容类型偏好
+    type_counter = Counter()
+    for h in history:
+        item = history_items.get(h.item_id)
+        if item and item.item_type:
+            type_counter[item.item_type] += 1
+    total_type = sum(type_counter.values()) or 1
+    content_type_preferences = [
+        ContentTypeStat(item_type=t, count=c, percentage=round(c / total_type * 100, 1))
+        for t, c in type_counter.most_common()
+    ]
+
+    # 6. 点赞/收藏的分类统计
+    liked_categories = _calc_category_stats(liked_items, len(likes))
+    collected_categories = _calc_category_stats(collected_items, len(collects))
+
+    interests = UserInterestProfile(
+        top_categories=top_categories,
+        top_tags=top_tags,
+        content_type_preferences=content_type_preferences,
+        liked_categories=liked_categories,
+        collected_categories=collected_categories
+    )
+
+    # 7. 行为统计
+    total_reading_time = sum(h.duration or 0 for h in history)
+    avg_reading_time = total_reading_time / len(history) if history else 0
+
+    # 每日活动统计（最近30天）
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    recent_history = [h for h in history if h.viewed_at and h.viewed_at >= thirty_days_ago]
+    recent_likes = [l for l in likes if l.created_at and l.created_at >= thirty_days_ago]
+    recent_collects = [c for c in collects if c.created_at and c.created_at >= thirty_days_ago]
+
+    daily_views = Counter()
+    daily_likes = Counter()
+    daily_collects = Counter()
+
+    for h in recent_history:
+        daily_views[h.viewed_at.strftime("%Y-%m-%d")] += 1
+    for l in recent_likes:
+        daily_likes[l.created_at.strftime("%Y-%m-%d")] += 1
+    for c in recent_collects:
+        daily_collects[c.created_at.strftime("%Y-%m-%d")] += 1
+
+    all_dates = set(list(daily_views.keys()) + list(daily_likes.keys()) + list(daily_collects.keys()))
+    daily_activities = [
+        DailyActivity(date=d, views=daily_views.get(d, 0), likes=daily_likes.get(d, 0), collects=daily_collects.get(d, 0))
+        for d in sorted(all_dates)
+    ]
+
+    # 阅读时段分析
+    hour_counter = Counter()
+    for h in history:
+        if h.viewed_at:
+            hour_counter[h.viewed_at.hour] += 1
+    reading_patterns = [ReadingPattern(hour=h, count=hour_counter.get(h, 0)) for h in range(24)]
+    most_active_hour = hour_counter.most_common(1)[0][0] if hour_counter else None
+
+    behavior = UserBehaviorStats(
+        total_reading_time_seconds=total_reading_time,
+        avg_reading_time_seconds=round(avg_reading_time, 1),
+        total_items_viewed=len(history),
+        total_likes=len(likes),
+        total_collects=len(collects),
+        most_active_hour=most_active_hour,
+        daily_activities=daily_activities,
+        reading_patterns=reading_patterns
+    )
+
+    # 8. 参与度指标
+    like_rate = len(likes) / len(history) if history else 0
+    collect_rate = len(collects) / len(history) if history else 0
+
+    # 最活跃分类（点赞+收藏最多的）
+    engagement_counter = Counter()
+    for item in liked_items.values():
+        if item.category:
+            engagement_counter[item.category] += 1
+    for item in collected_items.values():
+        if item.category:
+            engagement_counter[item.category] += 1
+    most_engaged_category = engagement_counter.most_common(1)[0][0] if engagement_counter else None
+
+    # 连续活跃天数
+    if history:
+        view_dates = sorted(set(h.viewed_at.date() for h in history if h.viewed_at))
+        max_streak = 1
+        current_streak = 1
+        for i in range(1, len(view_dates)):
+            if (view_dates[i] - view_dates[i - 1]).days == 1:
+                current_streak += 1
+                max_streak = max(max_streak, current_streak)
+            else:
+                current_streak = 1
+    else:
+        max_streak = 0
+
+    avg_daily_views = len(history) / 30 if history else 0
+
+    engagement = UserEngagementMetrics(
+        like_rate=round(like_rate, 3),
+        collect_rate=round(collect_rate, 3),
+        avg_daily_views=round(avg_daily_views, 1),
+        most_engaged_category=most_engaged_category,
+        longest_streak_days=max_streak
+    )
+
+    # 9. 最近的互动列表（取最近10条）
+    recent_likes_list = [
+        _item_to_dict(liked_items[l.item_id])
+        for l in sorted(likes, key=lambda x: x.created_at, reverse=True)[:10]
+        if l.item_id in liked_items
+    ]
+    recent_collects_list = [
+        _item_to_dict(collected_items[c.item_id])
+        for c in sorted(collects, key=lambda x: x.created_at, reverse=True)[:10]
+        if c.item_id in collected_items
+    ]
+    recent_history_list = [
+        {**_item_to_dict(history_items[h.item_id]), "viewed_at": h.viewed_at.isoformat() if h.viewed_at else None, "duration": h.duration}
+        for h in sorted(history, key=lambda x: x.viewed_at, reverse=True)[:10]
+        if h.item_id in history_items
+    ]
+
+    return UserProfile(
+        user=UserResponse.model_validate(current_user),
+        interests=interests,
+        behavior=behavior,
+        engagement=engagement,
+        recent_likes=recent_likes_list,
+        recent_collects=recent_collects_list,
+        recent_history=recent_history_list
+    )
+
+
 def _item_to_dict(item: FeedItem) -> dict:
     return {
         "id": item.id,
@@ -250,7 +446,7 @@ def _item_to_dict(item: FeedItem) -> dict:
         "image_url": item.image_url,
         "media_url": item.media_url,
         "tags": item.tags.split(',') if item.tags else [],
-        "published_at": item.published_at,
+        "published_at": item.published_at.isoformat() if item.published_at else None,
         "brand": item.brand,
         "cta_text": item.cta_text,
         "price_text": item.price_text,

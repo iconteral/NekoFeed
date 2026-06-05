@@ -94,7 +94,7 @@ class AuthRepository(
     }
 
     suspend fun logout() {
-        tokenManager.clearAll()
+        tokenManager.clearAuth()
         onTokenChanged?.invoke(null)
     }
 
