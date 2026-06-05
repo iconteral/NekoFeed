@@ -7,14 +7,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -41,11 +41,11 @@ sealed class BottomNavItem(
         unselectedIcon = Icons.Outlined.Home
     )
 
-    data object Search : BottomNavItem(
-        route = "search",
-        label = "搜索",
-        selectedIcon = Icons.Filled.Search,
-        unselectedIcon = Icons.Outlined.Search
+    data object Chat : BottomNavItem(
+        route = "chat",
+        label = "AI",
+        selectedIcon = Icons.AutoMirrored.Filled.Chat,
+        unselectedIcon = Icons.AutoMirrored.Outlined.Chat
     )
 
     data object Stats : BottomNavItem(
@@ -65,7 +65,7 @@ sealed class BottomNavItem(
 
 val bottomNavItems = listOf(
     BottomNavItem.Home,
-    BottomNavItem.Search,
+    BottomNavItem.Chat,
     BottomNavItem.Stats,
     BottomNavItem.Profile
 )

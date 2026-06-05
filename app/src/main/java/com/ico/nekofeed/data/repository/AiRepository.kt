@@ -267,6 +267,27 @@ item_types 可选值：article, video, ad, product, local
         aiCacheDao.clearAll()
     }
 
+    suspend fun chatWithContext(messages: List<ChatMessage>): String? {
+        val config = getConfig()
+        val api = getApi() ?: return null
+
+        val request = ChatRequest(
+            model = config.model,
+            messages = messages,
+            max_tokens = 1024,
+            temperature = 0.7f
+        )
+
+        val auth = if (config.apiKey.isNotBlank()) "Bearer ${config.apiKey}" else ""
+        return try {
+            val response = api.chatCompletion(auth, request)
+            response.choices.firstOrNull()?.message?.content
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
     private suspend fun cleanOldCache() {
         val sevenDaysAgo = System.currentTimeMillis() - 7 * 24 * 60 * 60 * 1000L
         aiCacheDao.deleteOldCache(sevenDaysAgo)

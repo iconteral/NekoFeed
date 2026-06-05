@@ -73,6 +73,8 @@ fun FeedScreen(
     onSearchClick: () -> Unit = {},
     onStatsClick: () -> Unit = {},
     onAiSettingsClick: () -> Unit = {},
+    isLoggedIn: Boolean = true,
+    onLogin: () -> Unit = {},
     viewModel: FeedViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -90,8 +92,20 @@ fun FeedScreen(
         onRefresh = viewModel::refresh,
         onRetry = viewModel::retry,
         onLoadMore = viewModel::loadMore,
-        onLikeClick = viewModel::toggleLike,
-        onCollectClick = viewModel::toggleCollect,
+        onLikeClick = { itemId ->
+            if (isLoggedIn) {
+                viewModel.toggleLike(itemId)
+            } else {
+                onLogin()
+            }
+        },
+        onCollectClick = { itemId ->
+            if (isLoggedIn) {
+                viewModel.toggleCollect(itemId)
+            } else {
+                onLogin()
+            }
+        },
         onShareClick = viewModel::toggleShare,
         onTagClick = viewModel::filterByTag,
         onAiRequest = viewModel::requestAiAnalysis,

@@ -1,5 +1,6 @@
 package com.ico.nekofeed.ui.feed.components
 
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AssistChip
@@ -8,6 +9,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -28,9 +30,36 @@ fun FeedTagChip(
         modifier = modifier,
         shape = RoundedCornerShape(20.dp),
         colors = AssistChipDefaults.assistChipColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.12f),
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
             labelColor = MaterialTheme.colorScheme.primary
         ),
         border = null
     )
 }
+
+@Preview(showBackground = true)
+@Composable
+fun FeedTagChipPreview() {
+    Row() {
+        FeedTagChip(
+            tag = "manga",
+            onClick = {}
+        )
+        FeedTagChip(
+            tag = "Bimi",
+            onClick = {}
+        )
+    }
+
+}
+
+@Preview(showBackground = true)
+@Composable
+fun FeedTagChipSmallPreview() {
+    FeedTagChip(
+        tag = "Action",
+        onClick = {},
+        small = true
+    )
+}
+

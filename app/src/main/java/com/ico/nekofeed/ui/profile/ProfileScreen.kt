@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
@@ -29,15 +31,18 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -48,14 +53,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
 import com.ico.nekofeed.data.model.UserStats
 import com.ico.nekofeed.ui.auth.AuthUiState
 import com.ico.nekofeed.ui.auth.AuthViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ProfileScreen(
     authViewModel: AuthViewModel,
@@ -84,7 +91,10 @@ fun ProfileScreen(
         authState = authState,
         userStats = userStats,
         isLoadingStats = isLoadingStats,
-        onLogout = { authViewModel.logout() },
+        onLogout = { 
+            authViewModel.logout()
+            onLogout()
+        },
         onLogin = onLogin,
         onNavigateToLikes = onNavigateToLikes,
         onNavigateToCollections = onNavigateToCollections,
@@ -94,7 +104,7 @@ fun ProfileScreen(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ProfileScreenContent(
     authState: AuthUiState,
@@ -113,8 +123,14 @@ fun ProfileScreenContent(
     Column(
         modifier = Modifier.fillMaxSize()
     ) {
-        TopAppBar(
-            title = { Text("个人中心") },
+        CenterAlignedTopAppBar(
+            title = {
+                Text(
+                    text = "个人中心",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.ExtraBold
+                )
+            },
             navigationIcon = {
                 IconButton(onClick = onBack) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
@@ -126,7 +142,10 @@ fun ProfileScreenContent(
                         Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "退出登录")
                     }
                 }
-            }
+            },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = Color.Transparent
+            )
         )
 
         Column(
@@ -134,185 +153,161 @@ fun ProfileScreenContent(
                 .fillMaxSize()
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // 头像
-            Box(
-                modifier = Modifier
-                    .size(100.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // 头像与基本信息
+            Surface(
+                modifier = Modifier.size(100.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer
             ) {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = "头像",
-                    modifier = Modifier.size(56.dp),
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = "头像",
+                        modifier = Modifier.size(48.dp),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 用户名
             Text(
                 text = if (isLoggedIn) authState.user?.username ?: "用户" else "访客",
-                style = MaterialTheme.typography.headlineMedium
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.ExtraBold
             )
 
-            // 简介（仅登录用户）
-            if (isLoggedIn && !authState.user?.bio.isNullOrEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = authState.user?.bio ?: "",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            // 等级（仅登录用户）
             if (isLoggedIn) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "等级: ${authState.user?.level ?: "普通"}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
+                if (!authState.user?.bio.isNullOrEmpty()) {
+                    Text(
+                        text = authState.user?.bio ?: "",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+                
+                Surface(
+                    modifier = Modifier.padding(top = 8.dp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                    shape = CircleShape
+                ) {
+                    Text(
+                        text = "等级: ${authState.user?.level ?: "普通"}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(32.dp))
 
             if (isLoggedIn) {
-                // 统计卡片（仅登录用户）
+                // 统计数据
                 Card(
                     modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(28.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
                     )
                 ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        Text(
-                            text = "数据统计",
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(bottom = 16.dp)
+                        StatItem(
+                            icon = Icons.Default.Favorite,
+                            label = "点赞",
+                            count = userStats?.likesCount ?: 0
                         )
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly
-                        ) {
-                            StatItem(
-                                icon = Icons.Default.Favorite,
-                                label = "点赞",
-                                count = userStats?.likesCount ?: 0
-                            )
-                            StatItem(
-                                icon = Icons.Default.Collections,
-                                label = "收藏",
-                                count = userStats?.collectionsCount ?: 0
-                            )
-                            StatItem(
-                                icon = Icons.Default.History,
-                                label = "历史",
-                                count = userStats?.historyCount ?: 0
-                            )
-                        }
+                        StatItem(
+                            icon = Icons.Default.Collections,
+                            label = "收藏",
+                            count = userStats?.collectionsCount ?: 0
+                        )
+                        StatItem(
+                            icon = Icons.Default.History,
+                            label = "历史",
+                            count = userStats?.historyCount ?: 0
+                        )
                     }
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // 菜单项（仅登录用户）
+                // 菜单
                 Card(
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(28.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                    )
                 ) {
-                    Column {
+                    Column(modifier = Modifier.padding(vertical = 8.dp)) {
                         MenuItem(
                             icon = Icons.Default.Favorite,
                             title = "我的点赞",
                             onClick = onNavigateToLikes
                         )
-                        Divider(modifier = Modifier.padding(horizontal = 16.dp))
                         MenuItem(
                             icon = Icons.Default.Collections,
                             title = "我的收藏",
                             onClick = onNavigateToCollections
                         )
-                        Divider(modifier = Modifier.padding(horizontal = 16.dp))
                         MenuItem(
                             icon = Icons.Default.History,
                             title = "浏览历史",
                             onClick = onNavigateToHistory
                         )
-                        Divider(modifier = Modifier.padding(horizontal = 16.dp))
-                        MenuItem(
-                            icon = Icons.Default.Edit,
-                            title = "编辑资料",
-                            onClick = { }
+                        HorizontalDivider(
+                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                         )
-                        Divider(modifier = Modifier.padding(horizontal = 16.dp))
-                        MenuItem(
-                            icon = Icons.Default.Lock,
-                            title = "修改密码",
-                            onClick = { }
-                        )
-                        Divider(modifier = Modifier.padding(horizontal = 16.dp))
                         MenuItem(
                             icon = Icons.Default.Settings,
-                            title = "设置",
+                            title = "AI 设置",
                             onClick = onNavigateToAiSettings
                         )
                     }
                 }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // 退出登录按钮（仅登录用户）
-                OutlinedButton(
-                    onClick = onLogout,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
-                    )
-                ) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.ExitToApp,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("退出登录")
-                }
             } else {
-                // 访客模式：登录按钮
-                Spacer(modifier = Modifier.height(16.dp))
-
+                // 访客模式
                 Button(
                     onClick = onLogin,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(50.dp)
+                        .height(56.dp),
+                    shape = CircleShape
                 ) {
-                    Icon(
-                        Icons.Default.Person,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("登录 / 注册", style = MaterialTheme.typography.titleMedium)
+                    Text("登录 / 注册", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Text(
-                    text = "登录后可使用点赞、收藏、浏览历史等功能",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                    )
+                ) {
+                    MenuItem(
+                        icon = Icons.Default.Settings,
+                        title = "通用设置",
+                        onClick = onNavigateToAiSettings
+                    )
+                }
             }
+
+            Spacer(modifier = Modifier.height(40.dp))
         }
     }
 }

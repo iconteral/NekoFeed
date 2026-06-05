@@ -45,3 +45,17 @@ data class StatsUiState(
     val ctr: Float = 0f,
     val topItems: List<FeedItem> = emptyList()
 )
+
+data class ChatUiState(
+    val messages: List<ChatBubble> = emptyList(),
+    val isAiTyping: Boolean = false,
+    val errorMessage: String? = null
+)
+
+data class ChatBubble(
+    val id: Long = 0,
+    val role: String,
+    val content: String,
+    val recommendedItems: List<FeedItem> = emptyList(),
+    val timestamp: Long = System.currentTimeMillis()
+)
