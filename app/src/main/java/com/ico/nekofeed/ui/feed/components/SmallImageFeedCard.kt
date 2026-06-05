@@ -23,6 +23,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,46 +72,52 @@ fun SmallImageFeedCard(
 
             val summary = item.aiSummary
             val isLoading = item.isAiLoading
-            if (!summary.isNullOrBlank()) {
-                Column {
-                    // AI 摘要
-                    Row(
-                        verticalAlignment = Alignment.Top,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    ) {
-                        Text(
-                            text = "✨",
-                            style = MaterialTheme.typography.labelSmall,
-                            modifier = Modifier.padding(end = 4.dp)
-                        )
-                        Text(
-                            text = summary,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            lineHeight = MaterialTheme.typography.bodySmall.lineHeight
-                        )
-                    }
-
-                    // 标签
-                    if (item.displayTags.isNotEmpty()) {
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
+            
+            AnimatedContent(
+                targetState = Triple(summary, isLoading, summary.isNullOrBlank() && isAiEnabled && isLoading),
+                transitionSpec = { fadeIn() togetherWith fadeOut() },
+                label = "ai_content_transition"
+            ) { (summaryText, loading, showLoading) ->
+                if (!summaryText.isNullOrBlank()) {
+                    Column {
+                        // AI 摘要
+                        Row(
+                            verticalAlignment = Alignment.Top,
                             modifier = Modifier.padding(bottom = 8.dp)
                         ) {
-                            item.displayTags.take(2).forEach { tag ->
-                                FeedTagChip(
-                                    tag = tag,
-                                    onClick = { onTagClick?.invoke(tag) },
-                                    small = true
-                                )
+                            Text(
+                                text = "✨",
+                                style = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier.padding(end = 4.dp)
+                            )
+                            Text(
+                                text = summaryText,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                lineHeight = MaterialTheme.typography.bodySmall.lineHeight
+                            )
+                        }
+
+                        // 标签
+                        if (item.displayTags.isNotEmpty()) {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            ) {
+                                item.displayTags.take(2).forEach { tag ->
+                                    FeedTagChip(
+                                        tag = tag,
+                                        onClick = { onTagClick?.invoke(tag) },
+                                        small = true
+                                    )
+                                }
                             }
                         }
                     }
-                }
-            } else if (isAiEnabled && isLoading) {
+                } else if (showLoading) {
                     // Placeholder frame (缺省框体)
                     Column(
                         modifier = Modifier
@@ -150,6 +160,7 @@ fun SmallImageFeedCard(
                                 trackColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
                             )
                         }
+                    }
                 }
             }
 

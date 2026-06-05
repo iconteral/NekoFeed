@@ -201,7 +201,7 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private val aiSemaphore = Semaphore(2)
+    private val aiSemaphore = Semaphore(8)
 
     fun requestAiAnalysis(item: FeedItem) {
         if (!item.aiSummary.isNullOrBlank() || item.isAiLoading) return

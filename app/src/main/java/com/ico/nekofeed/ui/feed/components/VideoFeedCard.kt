@@ -28,6 +28,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -233,48 +237,54 @@ fun VideoFeedCard(
 
             val summary = item.aiSummary
             val isLoading = item.isAiLoading
-            if (!summary.isNullOrBlank()) {
-                Column {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(
-                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.12f),
-                                RoundedCornerShape(10.dp)
-                            )
-                            .padding(10.dp, 12.dp),
-                        verticalAlignment = Alignment.Top
-                    ) {
-                        Text(
-                            text = "✨",
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(end = 8.dp)
-                        )
-                        Text(
-                            text = summary,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            lineHeight = MaterialTheme.typography.bodySmall.lineHeight
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    if (item.displayTags.isNotEmpty()) {
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
-                            modifier = Modifier.padding(bottom = 14.dp)
-                        ) {
-                            item.displayTags.forEach { tag ->
-                                FeedTagChip(
-                                    tag = tag,
-                                    onClick = { onTagClick?.invoke(tag) }
+            
+            AnimatedContent(
+                targetState = Triple(summary, isLoading, summary.isNullOrBlank() && isAiEnabled && isLoading),
+                transitionSpec = { fadeIn() togetherWith fadeOut() },
+                label = "ai_content_transition"
+            ) { (summaryText, loading, showLoading) ->
+                if (!summaryText.isNullOrBlank()) {
+                    Column {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.12f),
+                                    RoundedCornerShape(10.dp)
                                 )
+                                .padding(10.dp, 12.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Text(
+                                text = "✨",
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(end = 8.dp)
+                            )
+                            Text(
+                                text = summaryText,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = MaterialTheme.typography.bodySmall.lineHeight
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        if (item.displayTags.isNotEmpty()) {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.padding(bottom = 14.dp)
+                            ) {
+                                item.displayTags.forEach { tag ->
+                                    FeedTagChip(
+                                        tag = tag,
+                                        onClick = { onTagClick?.invoke(tag) }
+                                    )
+                                }
                             }
                         }
                     }
-                }
-            } else if (isAiEnabled && isLoading) {
+                } else if (showLoading) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -316,6 +326,7 @@ fun VideoFeedCard(
                     }
                     Spacer(modifier = Modifier.height(10.dp))
                 }
+            }
 
             // 互动按钮行
             Row(
