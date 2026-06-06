@@ -1,6 +1,19 @@
 package com.ico.nekofeed.navigation
 
 import android.net.Uri
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
@@ -53,7 +66,11 @@ fun AppNavHost(
 
     NavHost(
         navController = navController,
-        startDestination = startDestination
+        startDestination = startDestination,
+        enterTransition = { expressiveEnterTransition() },
+        exitTransition = { expressiveExitTransition() },
+        popEnterTransition = { expressivePopEnterTransition() },
+        popExitTransition = { expressivePopExitTransition() }
     ) {
         // Onboarding
         composable("onboarding") {
@@ -183,7 +200,20 @@ private fun MainScreen(
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
-            if (showBottomBar) {
+            AnimatedVisibility(
+                visible = showBottomBar,
+                enter = fadeIn() + slideInVertically(
+                    initialOffsetY = { it / 2 },
+                    animationSpec = spring(
+                        dampingRatio = 0.82f,
+                        stiffness = Spring.StiffnessMediumLow
+                    )
+                ),
+                exit = fadeOut() + slideOutVertically(
+                    targetOffsetY = { it / 2 },
+                    animationSpec = spring(stiffness = Spring.StiffnessMedium)
+                )
+            ) {
                 NekoFeedBottomNavigationBar(
                     currentRoute = currentRoute,
                     onNavigate = { route ->
@@ -200,6 +230,10 @@ private fun MainScreen(
         NavHost(
             navController = nestedNavController,
             startDestination = "feed",
+            enterTransition = { expressiveEnterTransition() },
+            exitTransition = { expressiveExitTransition() },
+            popEnterTransition = { expressivePopEnterTransition() },
+            popExitTransition = { expressivePopExitTransition() },
             modifier = Modifier.padding(
                 bottom = paddingValues.calculateBottomPadding()
             )
@@ -325,4 +359,58 @@ private fun MainScreen(
             }
         }
     }
+}
+
+private fun expressiveEnterTransition(): EnterTransition {
+    return fadeIn(
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+    ) + scaleIn(
+        initialScale = 0.96f,
+        animationSpec = spring(
+            dampingRatio = 0.82f,
+            stiffness = Spring.StiffnessMediumLow
+        )
+    ) + slideInHorizontally(
+        initialOffsetX = { it / 12 },
+        animationSpec = spring(
+            dampingRatio = 0.86f,
+            stiffness = Spring.StiffnessMediumLow
+        )
+    )
+}
+
+private fun expressiveExitTransition(): ExitTransition {
+    return fadeOut(
+        animationSpec = spring(stiffness = Spring.StiffnessMedium)
+    ) + scaleOut(
+        targetScale = 0.985f,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium)
+    ) + slideOutHorizontally(
+        targetOffsetX = { -it / 18 },
+        animationSpec = spring(stiffness = Spring.StiffnessMedium)
+    )
+}
+
+private fun expressivePopEnterTransition(): EnterTransition {
+    return fadeIn(
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+    ) + scaleIn(
+        initialScale = 0.985f,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+    ) + slideInHorizontally(
+        initialOffsetX = { -it / 18 },
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+    )
+}
+
+private fun expressivePopExitTransition(): ExitTransition {
+    return fadeOut(
+        animationSpec = spring(stiffness = Spring.StiffnessMedium)
+    ) + scaleOut(
+        targetScale = 0.96f,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium)
+    ) + slideOutHorizontally(
+        targetOffsetX = { it / 12 },
+        animationSpec = spring(stiffness = Spring.StiffnessMedium)
+    )
 }

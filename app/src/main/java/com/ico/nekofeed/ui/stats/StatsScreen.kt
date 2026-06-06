@@ -184,13 +184,15 @@ fun StatsScreen(
 
             // 排行榜列表
             itemsIndexed(
-                items = sortedItems
+                items = sortedItems,
+                key = { _, item -> item.id }
             ) { index, item ->
                 RankingItem(
                     rank = index + 1,
                     item = item,
                     maxExposure = sortedItems.firstOrNull()?.exposureCount ?: 1,
-                    onClick = { onItemClick(item.id) }
+                    onClick = { onItemClick(item.id) },
+                    modifier = Modifier.animateItem()
                 )
             }
         }
@@ -337,7 +339,8 @@ private fun RankingItem(
     rank: Int,
     item: FeedItem,
     maxExposure: Int,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     var progress by remember { mutableFloatStateOf(0f) }
     LaunchedEffect(item.exposureCount, maxExposure) {
@@ -355,7 +358,7 @@ private fun RankingItem(
 
     Card(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface

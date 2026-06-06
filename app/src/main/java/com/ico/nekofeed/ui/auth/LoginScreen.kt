@@ -1,5 +1,16 @@
 package com.ico.nekofeed.ui.auth
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -168,13 +179,28 @@ fun LoginScreenContent(
                 .height(54.dp),
             shape = RoundedCornerShape(18.dp)
         ) {
-            if (uiState.isLoading) {
-                LoadingIndicator(
-                    modifier = Modifier.size(24.dp),
-                    color = MaterialTheme.colorScheme.onPrimary
-                )
-            } else {
-                Text("登录", style = MaterialTheme.typography.titleMedium)
+            AnimatedContent(
+                targetState = uiState.isLoading,
+                transitionSpec = {
+                    (fadeIn() + scaleIn(
+                        initialScale = 0.72f,
+                        animationSpec = spring(
+                            dampingRatio = 0.72f,
+                            stiffness = Spring.StiffnessMedium
+                        )
+                    )) togetherWith
+                        (fadeOut() + scaleOut(targetScale = 0.82f))
+                },
+                label = "login_button_state"
+            ) { loading ->
+                if (loading) {
+                    LoadingIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Text("登录", style = MaterialTheme.typography.titleMedium)
+                }
             }
         }
         Spacer(modifier = Modifier.height(8.dp))
@@ -249,13 +275,24 @@ internal fun AuthPage(
 
 @Composable
 internal fun AuthError(error: String?) {
-    if (error != null) {
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(
-            text = error,
-            color = MaterialTheme.colorScheme.error,
-            style = MaterialTheme.typography.bodyMedium
-        )
+    AnimatedVisibility(
+        visible = error != null,
+        enter = fadeIn() + expandVertically(
+            animationSpec = spring(
+                dampingRatio = 0.82f,
+                stiffness = Spring.StiffnessMediumLow
+            )
+        ),
+        exit = fadeOut() + shrinkVertically()
+    ) {
+        Column {
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = error.orEmpty(),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
     }
 }
 
