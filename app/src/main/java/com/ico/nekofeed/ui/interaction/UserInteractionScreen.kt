@@ -1,5 +1,13 @@
 package com.ico.nekofeed.ui.interaction
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,6 +51,13 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ico.nekofeed.data.model.FeedItem
 import com.ico.nekofeed.ui.feed.components.FeedItemCard
+
+private enum class InteractionBodyState {
+    LOADING,
+    ERROR,
+    EMPTY,
+    CONTENT
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -129,13 +144,33 @@ fun UserInteractionScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            when {
-                uiState.isLoading && uiState.items.isEmpty() -> {
+            val bodyState = when {
+                uiState.isLoading && uiState.items.isEmpty() -> InteractionBodyState.LOADING
+                uiState.error != null && uiState.items.isEmpty() -> InteractionBodyState.ERROR
+                uiState.items.isEmpty() -> InteractionBodyState.EMPTY
+                else -> InteractionBodyState.CONTENT
+            }
+            AnimatedContent(
+                targetState = bodyState,
+                transitionSpec = {
+                    (fadeIn() + scaleIn(
+                        initialScale = 0.97f,
+                        animationSpec = spring(
+                            dampingRatio = 0.82f,
+                            stiffness = Spring.StiffnessMediumLow
+                        )
+                    )) togetherWith
+                        (fadeOut() + scaleOut(targetScale = 0.985f))
+                },
+                label = "interaction_body_state"
+            ) { state ->
+                when (state) {
+                InteractionBodyState.LOADING -> {
                     CircularProgressIndicator(
                         modifier = Modifier.align(Alignment.Center)
                     )
                 }
-                uiState.error != null && uiState.items.isEmpty() -> {
+                InteractionBodyState.ERROR -> {
                     Column(
                         modifier = Modifier.align(Alignment.Center),
                         horizontalAlignment = Alignment.CenterHorizontally
@@ -150,7 +185,7 @@ fun UserInteractionScreen(
                         }
                     }
                 }
-                uiState.items.isEmpty() -> {
+                InteractionBodyState.EMPTY -> {
                     Column(
                         modifier = Modifier.align(Alignment.Center),
                         horizontalAlignment = Alignment.CenterHorizontally
@@ -166,7 +201,7 @@ fun UserInteractionScreen(
                         )
                     }
                 }
-                else -> {
+                InteractionBodyState.CONTENT -> {
                     LazyColumn(
                         state = listState,
                         contentPadding = PaddingValues(16.dp),
@@ -180,7 +215,8 @@ fun UserInteractionScreen(
                                 item = item,
                                 onClick = { onItemClick(item.id) },
                                 onLikeClick = { viewModel.toggleLike(it) },
-                                onCollectClick = { viewModel.toggleCollect(it) }
+                                onCollectClick = { viewModel.toggleCollect(it) },
+                                modifier = Modifier.animateItem()
                             )
                         }
 
@@ -201,6 +237,7 @@ fun UserInteractionScreen(
                         }
                     }
                 }
+            }
             }
         }
     }

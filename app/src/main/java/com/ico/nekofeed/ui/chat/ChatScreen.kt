@@ -154,7 +154,8 @@ fun ChatScreen(
                     onItemClick = onItemClick,
                     onLikeClick = onLikeClick,
                     onCollectClick = onCollectClick,
-                    onShareClick = onShareClick
+                    onShareClick = onShareClick,
+                    modifier = Modifier.animateItem()
                 )
             }
 
@@ -164,11 +165,13 @@ fun ChatScreen(
                 }
             }
 
-            if (uiState.errorMessage != null) {
-                item(key = "error_message") {
-                    uiState.errorMessage?.let { message ->
-                        ErrorMessage(message)
-                    }
+            item(key = "error_message") {
+                AnimatedVisibility(
+                    visible = uiState.errorMessage != null,
+                    enter = fadeIn(animationSpec = tween(220)),
+                    exit = androidx.compose.animation.fadeOut(animationSpec = tween(160))
+                ) {
+                    ErrorMessage(uiState.errorMessage.orEmpty())
                 }
             }
 
@@ -250,12 +253,13 @@ private fun ChatBubbleItem(
     onItemClick: (String) -> Unit,
     onLikeClick: (String) -> Unit = {},
     onCollectClick: (String) -> Unit = {},
-    onShareClick: (String) -> Unit = {}
+    onShareClick: (String) -> Unit = {},
+    modifier: Modifier = Modifier
 ) {
     val isUser = bubble.role == "user"
 
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
     ) {
         Column(

@@ -1,6 +1,16 @@
 package com.ico.nekofeed.ui.feed
 
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -93,6 +103,12 @@ private val FeedCategories = listOf(
     FeedCategory.AI
 )
 
+private enum class FeedBodyState {
+    LOADING,
+    ERROR,
+    CONTENT
+}
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun FeedScreen(
@@ -170,6 +186,9 @@ fun FeedScreenContent(
 ) {
     val coroutineScope = rememberCoroutineScope()
     val selectedPage = FeedCategories.indexOf(uiState.selectedCategory).coerceAtLeast(0)
+    val currentSelectedCategory by rememberUpdatedState(uiState.selectedCategory)
+    val currentOnCategorySelected by rememberUpdatedState(onCategorySelected)
+    val currentOnPlayingItemChange by rememberUpdatedState(onPlayingItemChange)
     val pagerState = rememberPagerState(
         initialPage = selectedPage,
         pageCount = { FeedCategories.size }
@@ -186,9 +205,9 @@ fun FeedScreenContent(
             .distinctUntilChanged()
             .collect { page ->
                 val category = FeedCategories[page]
-                if (category != uiState.selectedCategory) {
-                    onPlayingItemChange(null)
-                    onCategorySelected(category)
+                if (category != currentSelectedCategory) {
+                    currentOnPlayingItemChange(null)
+                    currentOnCategorySelected(category)
                 }
             }
     }
@@ -293,35 +312,57 @@ fun FeedScreenContent(
                 },
                 modifier = Modifier.fillMaxSize()
             ) {
-                when {
-                    pageCategory != uiState.selectedCategory || uiState.isLoading -> {
+                val bodyState = when {
+                    pageCategory != uiState.selectedCategory || uiState.isLoading ->
+                        FeedBodyState.LOADING
+                    uiState.errorMessage != null && uiState.items.isEmpty() ->
+                        FeedBodyState.ERROR
+                    else -> FeedBodyState.CONTENT
+                }
+                AnimatedContent(
+                    targetState = bodyState,
+                    transitionSpec = {
+                        (fadeIn() + scaleIn(
+                            initialScale = 0.975f,
+                            animationSpec = spring(
+                                dampingRatio = 0.84f,
+                                stiffness = Spring.StiffnessMediumLow
+                            )
+                        )) togetherWith
+                            (fadeOut() + scaleOut(targetScale = 0.99f))
+                    },
+                    label = "feed_body_state"
+                ) { state ->
+                    when (state) {
+                        FeedBodyState.LOADING -> {
                         FeedLoadingContent()
-                    }
-                    uiState.errorMessage != null && uiState.items.isEmpty() -> {
-                        ErrorContent(
-                            message = uiState.errorMessage,
-                            onRetry = onRetry
-                        )
-                    }
-                    else -> {
-                        FeedContent(
-                            items = uiState.items,
-                            usingFallback = uiState.usingFallback,
-                            isLoadingMore = uiState.isLoadingMore,
-                            hasMore = uiState.hasMore,
-                            listState = listState,
-                            isAiEnabled = uiState.isAiEnabled,
-                            playingItemId = playingItemId,
-                            onItemClick = onItemClick,
-                            onLoadMore = onLoadMore,
-                            onLikeClick = onLikeClick,
-                            onCollectClick = onCollectClick,
-                            onShareClick = onShareClick,
-                            onTagClick = onTagClick,
-                            onAiRequest = onAiRequest,
-                            onExposure = onExposure,
-                            onPlayingItemChange = onPlayingItemChange
-                        )
+                        }
+                        FeedBodyState.ERROR -> {
+                            ErrorContent(
+                                message = uiState.errorMessage.orEmpty(),
+                                onRetry = onRetry
+                            )
+                        }
+                        FeedBodyState.CONTENT -> {
+                            FeedContent(
+                                items = uiState.items,
+                                usingFallback = uiState.usingFallback,
+                                isLoadingMore = uiState.isLoadingMore,
+                                hasMore = uiState.hasMore,
+                                listState = listState,
+                                isAiEnabled = uiState.isAiEnabled,
+                                playingItemId = playingItemId,
+                                onItemClick = onItemClick,
+                                onLoadMore = onLoadMore,
+                                onLikeClick = onLikeClick,
+                                onCollectClick = onCollectClick,
+                                onShareClick = onShareClick,
+                                onTagClick = onTagClick,
+                                onAiRequest = onAiRequest,
+                                onExposure = onExposure,
+                                onPlayingItemChange = onPlayingItemChange
+                            )
+                        }
                     }
                 }
             }
@@ -356,58 +397,76 @@ private fun FeedTagFilter(
     onTagClick: (String) -> Unit,
     onClearTags: () -> Unit
 ) {
-    if (availableTags.isEmpty()) return
-
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 8.dp)
+    AnimatedVisibility(
+        visible = availableTags.isNotEmpty(),
+        enter = fadeIn() + scaleIn(
+            initialScale = 0.94f,
+            animationSpec = spring(
+                dampingRatio = 0.76f,
+                stiffness = Spring.StiffnessMediumLow
+            )
+        ),
+        exit = fadeOut() + scaleOut(targetScale = 0.96f)
     ) {
-        item(key = "filter-label") {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.FilterList,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp)
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .animateContentSize(
+                    animationSpec = spring(
+                        dampingRatio = 0.82f,
+                        stiffness = Spring.StiffnessMediumLow
+                    )
                 )
-                Text(
-                    text = "筛选",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold
+                .padding(bottom = 8.dp)
+        ) {
+            item(key = "filter-label") {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.FilterList,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = "筛选",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            items(availableTags, key = { "tag-$it" }) { tag ->
+                FeedTagChip(
+                    tag = tag,
+                    onClick = { onTagClick(tag) },
+                    selected = tag in selectedTags,
+                    modifier = Modifier.animateItem()
                 )
             }
-        }
 
-        items(availableTags, key = { "tag-$it" }) { tag ->
-            FeedTagChip(
-                tag = tag,
-                onClick = { onTagClick(tag) },
-                selected = tag in selectedTags
-            )
-        }
-
-        if (selectedTags.isNotEmpty()) {
-            item(key = "clear-tags") {
-                FilterChip(
-                    selected = false,
-                    onClick = onClearTags,
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Filled.Close,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    },
-                    label = { Text("清除") }
-                )
+            if (selectedTags.isNotEmpty()) {
+                item(key = "clear-tags") {
+                    FilterChip(
+                        selected = false,
+                        onClick = onClearTags,
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Filled.Close,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        },
+                        label = { Text("清除") },
+                        modifier = Modifier.animateItem()
+                    )
+                }
             }
         }
     }
@@ -647,7 +706,8 @@ private fun FeedContent(
                 onTagClick = onTagClick,
                 isAiEnabled = isAiEnabled,
                 isPlaying = item.id == playingItemId,
-                onMuteToggle = { /* handled internally or by global state if needed */ }
+                onMuteToggle = { /* handled internally or by global state if needed */ },
+                modifier = Modifier.animateItem()
             )
         }
 

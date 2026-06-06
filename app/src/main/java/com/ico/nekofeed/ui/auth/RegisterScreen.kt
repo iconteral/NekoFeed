@@ -1,5 +1,13 @@
 package com.ico.nekofeed.ui.auth
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -165,13 +173,28 @@ fun RegisterScreenContent(
                 .height(54.dp),
             shape = RoundedCornerShape(18.dp)
         ) {
-            if (uiState.isLoading) {
-                LoadingIndicator(
-                    modifier = Modifier.size(24.dp),
-                    color = MaterialTheme.colorScheme.onPrimary
-                )
-            } else {
-                Text("注册", style = MaterialTheme.typography.titleMedium)
+            AnimatedContent(
+                targetState = uiState.isLoading,
+                transitionSpec = {
+                    (fadeIn() + scaleIn(
+                        initialScale = 0.72f,
+                        animationSpec = spring(
+                            dampingRatio = 0.72f,
+                            stiffness = Spring.StiffnessMedium
+                        )
+                    )) togetherWith
+                        (fadeOut() + scaleOut(targetScale = 0.82f))
+                },
+                label = "register_button_state"
+            ) { loading ->
+                if (loading) {
+                    LoadingIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Text("注册", style = MaterialTheme.typography.titleMedium)
+                }
             }
         }
         Spacer(modifier = Modifier.height(8.dp))

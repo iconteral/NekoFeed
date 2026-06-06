@@ -1,5 +1,13 @@
 package com.ico.nekofeed.ui.components
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -89,11 +97,26 @@ fun NekoFeedBottomNavigationBar(
                 selected = isSelected,
                 onClick = { onNavigate(item.route) },
                 icon = {
-                    Icon(
-                        imageVector = if (isSelected) item.selectedIcon else item.unselectedIcon,
-                        contentDescription = item.label,
-                        modifier = Modifier.size(22.dp)
-                    )
+                    AnimatedContent(
+                        targetState = isSelected,
+                        transitionSpec = {
+                            (fadeIn() + scaleIn(
+                                initialScale = 0.72f,
+                                animationSpec = spring(
+                                    dampingRatio = 0.68f,
+                                    stiffness = Spring.StiffnessMedium
+                                )
+                            )) togetherWith
+                                (fadeOut() + scaleOut(targetScale = 0.82f))
+                        },
+                        label = "bottom_nav_icon"
+                    ) { selected ->
+                        Icon(
+                            imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
+                            contentDescription = item.label,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
                 },
                 label = {
                     Text(
