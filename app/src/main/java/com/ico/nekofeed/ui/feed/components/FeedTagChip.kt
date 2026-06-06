@@ -17,6 +17,7 @@ fun FeedTagChip(
     tag: String,
     onClick: () -> Unit,
     small: Boolean = false,
+    selected: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     AssistChip(
@@ -30,8 +31,16 @@ fun FeedTagChip(
         modifier = modifier,
         shape = RoundedCornerShape(20.dp),
         colors = AssistChipDefaults.assistChipColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-            labelColor = MaterialTheme.colorScheme.primary
+            containerColor = if (selected) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+            },
+            labelColor = if (selected) {
+                MaterialTheme.colorScheme.onPrimary
+            } else {
+                MaterialTheme.colorScheme.primary
+            }
         ),
         border = null
     )
@@ -62,4 +71,3 @@ fun FeedTagChipSmallPreview() {
         small = true
     )
 }
-

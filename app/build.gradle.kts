@@ -54,6 +54,7 @@ dependencies {
     implementation(libs.retrofit.converter.gson)
     implementation(libs.okhttp.logging)
     implementation(libs.coil.compose)
+    implementation("io.coil-kt:coil-svg:2.7.0")
     implementation("androidx.datastore:datastore-preferences:1.1.4")
 
     // Room
@@ -74,5 +75,5 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
-    debugImplementation(libs.androidx.compose.ui.tooling)
+    implementation(libs.androidx.compose.ui.tooling)
 }

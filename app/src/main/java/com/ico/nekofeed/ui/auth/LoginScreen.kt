@@ -48,6 +48,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import com.ico.nekofeed.R
 import com.ico.nekofeed.ui.theme.NekoFeedTheme
 
 @Composable
@@ -217,14 +219,14 @@ internal fun AuthPage(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(72.dp)
-                        .background(
-                            MaterialTheme.colorScheme.primaryContainer,
-                            RoundedCornerShape(22.dp)
-                        ),
+                        .size(96.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("🐱", style = MaterialTheme.typography.displayMedium)
+                    AsyncImage(
+                        model = R.raw.neko_heart_eyes,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize()
+                    )
                 }
                 Spacer(modifier = Modifier.height(20.dp))
                 Text(

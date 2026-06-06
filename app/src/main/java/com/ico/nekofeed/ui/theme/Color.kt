@@ -10,17 +10,17 @@ val PrimaryLight = Color(0xFF8CC0EB)
 val PrimarySoft = Color(0xFFEAF6FF)
 val PrimaryGlow = Color(0x334A90C9)
 
-// Secondary - Cream Yellow 品牌点缀
-val Secondary = Color(0xFFFFD66B)
-val SecondaryDark = Color(0xFFE7A900)
-val SecondaryLight = Color(0xFFFFF9D2)
-val SecondarySoft = Color(0xFFFFF7D8)
+// Secondary - muted steel blue, close to the primary hue.
+val Secondary = Color(0xFF5D84A3)
+val SecondaryDark = Color(0xFF24445B)
+val SecondaryLight = Color(0xFFA9CBE3)
+val SecondarySoft = Color(0xFFE8F2F8)
 
-// Tertiary - Almond Beige 柔和辅助色
-val Tertiary = Color(0xFFE9B96E)
-val TertiaryDark = Color(0xFFC58A32)
-val TertiaryLight = Color(0xFFFFEBCC)
-val TertiarySoft = Color(0xFFFFF3E2)
+// Tertiary - restrained blue green for secondary emphasis.
+val Tertiary = Color(0xFF5E938C)
+val TertiaryDark = Color(0xFF244B46)
+val TertiaryLight = Color(0xFFA7D4CE)
+val TertiarySoft = Color(0xFFE5F3F1)
 
 // Accent Colors
 val AccentRed = Color(0xFFE5484D)

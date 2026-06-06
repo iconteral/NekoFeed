@@ -85,6 +85,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.ico.nekofeed.ui.theme.NekoFeedTheme
 import com.ico.nekofeed.ui.theme.AccentBlue
 import com.ico.nekofeed.ui.theme.AccentGreen
 import com.ico.nekofeed.ui.theme.AccentOrange
@@ -96,9 +97,8 @@ import com.ico.nekofeed.ui.theme.SecondaryDark
 import com.ico.nekofeed.ui.theme.SecondaryLight
 import com.ico.nekofeed.R
 import com.ico.nekofeed.ui.theme.StatExposureEnd
+import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
-
-private val NotoColorEmojiFont = FontFamily(Font(resId = R.font.noto_color_emoji_regular))
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class, ExperimentalAnimationApi::class)
 @Composable
@@ -134,7 +134,9 @@ fun OnboardingScreen(
     }
 
     Box(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
     ) {
         Box(
             modifier = Modifier
@@ -142,16 +144,19 @@ fun OnboardingScreen(
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
-                            Primary.copy(alpha = 0.1f),
-                            Secondary.copy(alpha = 0.05f),
-                            MaterialTheme.colorScheme.background
-                        )
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+                            Color.Transparent
+                        ),
+                        startY = 0f,
+                        endY = 1000f // 只覆盖顶部区域
                     )
                 )
         )
 
         Scaffold(
-            containerColor = Color.Transparent
+            containerColor = Color.Transparent,
+            contentColor = MaterialTheme.colorScheme.onBackground
         ) { paddingValues ->
             Column(
                 modifier = Modifier
@@ -251,7 +256,7 @@ fun OnboardingScreen(
                                         .height(8.dp)
                                         .clip(RoundedCornerShape(4.dp))
                                         .background(
-                                            if (isSelected) Primary else Primary.copy(alpha = 0.3f)
+                                            if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
                                         )
                                 )
                                 if (index < pageCount - 1) {
@@ -278,7 +283,7 @@ fun OnboardingScreen(
                         .height(56.dp),
                     shape = RoundedCornerShape(28.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Primary
+                        containerColor = MaterialTheme.colorScheme.primary
                     )
                 ) {
                     if (uiState.isSaving) {
@@ -324,10 +329,10 @@ internal fun WelcomePage() {
 
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = "😻",
-                fontSize = 64.sp,
-                fontFamily = NotoColorEmojiFont
+            AsyncImage(
+                model = R.raw.neko_heart_eyes,
+                contentDescription = null,
+                modifier = Modifier.size(96.dp)
             )
         }
 
@@ -335,7 +340,8 @@ internal fun WelcomePage() {
             text = "欢迎使用 NekoFeed",
             style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.ExtraBold,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onBackground
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -356,17 +362,17 @@ internal fun WelcomePage() {
             FeatureItem(
                 icon = Icons.Default.Memory,
                 label = "AI 摘要",
-                color = Primary
+                color = MaterialTheme.colorScheme.primary
             )
             FeatureItem(
                 icon = Icons.Default.SmartToy,
                 label = "智能搜索",
-                color = Secondary
+                color = MaterialTheme.colorScheme.secondary
             )
             FeatureItem(
                 icon = Icons.Default.Cloud,
                 label = "云端同步",
-                color = AccentBlue
+                color = MaterialTheme.colorScheme.tertiary
             )
         }
     }
@@ -426,7 +432,8 @@ internal fun ModeSelectionPage(
             text = "选择数据模式",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.ExtraBold,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onBackground
         )
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -511,13 +518,13 @@ internal fun ModeSelectionPage(
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(
                 containerColor = if (!useMockMode) {
-                    AccentBlue.copy(alpha = 0.1f)
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
                 } else {
                     MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                 }
             ),
             border = if (!useMockMode) {
-                androidx.compose.foundation.BorderStroke(2.dp, AccentBlue)
+                androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
             } else {
                 null
             }
@@ -532,7 +539,7 @@ internal fun ModeSelectionPage(
                     modifier = Modifier
                         .size(48.dp)
                         .background(
-                            AccentBlue.copy(alpha = 0.2f),
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
                             RoundedCornerShape(12.dp)
                         ),
                     contentAlignment = Alignment.Center
@@ -541,7 +548,7 @@ internal fun ModeSelectionPage(
                         imageVector = Icons.Default.Cloud,
                         contentDescription = null,
                         modifier = Modifier.size(24.dp),
-                        tint = AccentBlue
+                        tint = MaterialTheme.colorScheme.primary
                     )
                 }
                 Spacer(modifier = Modifier.width(16.dp))
@@ -561,7 +568,7 @@ internal fun ModeSelectionPage(
                     Icon(
                         imageVector = Icons.Default.Check,
                         contentDescription = null,
-                        tint = AccentBlue,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -585,7 +592,7 @@ internal fun ModeSelectionPage(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = AccentBlue,
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
                         unfocusedBorderColor = MaterialTheme.colorScheme.outline
                     )
                 )
@@ -617,7 +624,10 @@ internal fun LlmSettingsPage(
                 .size(80.dp)
                 .background(
                     Brush.linearGradient(
-                        colors = listOf(Primary, StatExposureEnd)
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primary,
+                            MaterialTheme.colorScheme.primaryContainer
+                        )
                     ),
                     RoundedCornerShape(20.dp)
                 ),
@@ -637,7 +647,8 @@ internal fun LlmSettingsPage(
             text = "配置 AI 服务",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.ExtraBold,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onBackground
         )
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -722,37 +733,45 @@ internal fun LlmSettingsPage(
 @Preview(showBackground = true)
 @Composable
 fun OnboardingScreenPreview() {
-    OnboardingScreen(onComplete = {})
+    NekoFeedTheme {
+        OnboardingScreen(onComplete = {})
+    }
 }
 
 @Preview(showBackground = true)
 @Composable
 fun WelcomePagePreview() {
-    WelcomePage()
+    NekoFeedTheme {
+        WelcomePage()
+    }
 }
 
 @Preview(showBackground = true)
 @Composable
 fun ModeSelectionPagePreview() {
-    ModeSelectionPage(
-        useMockMode = false,
-        onMockModeChange = {},
-        serverUrl = "http://10.0.2.2:8000",
-        onServerUrlChange = {}
-    )
+    NekoFeedTheme {
+        ModeSelectionPage(
+            useMockMode = false,
+            onMockModeChange = {},
+            serverUrl = "http://10.0.2.2:8000",
+            onServerUrlChange = {}
+        )
+    }
 }
 
 @Preview(showBackground = true)
 @Composable
 fun LlmSettingsPagePreview() {
-    LlmSettingsPage(
-        endpoint = "http://localhost:11434/v1",
-        onEndpointChange = {},
-        model = "gpt-4o-mini",
-        onModelChange = {},
-        apiKey = "",
-        onApiKeyChange = {}
-    )
+    NekoFeedTheme {
+        LlmSettingsPage(
+            endpoint = "http://localhost:11434/v1",
+            onEndpointChange = {},
+            model = "gpt-4o-mini",
+            onModelChange = {},
+            apiKey = "",
+            onApiKeyChange = {}
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -800,7 +819,8 @@ internal fun LoginPage(
             text = "登录账号",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.ExtraBold,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onBackground
         )
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -934,16 +954,18 @@ internal fun LoginPage(
 @Preview(showBackground = true)
 @Composable
 fun LoginPagePreview() {
-    LoginPage(
-        loginUsername = "",
-        onLoginUsernameChange = {},
-        loginPassword = "",
-        onLoginPasswordChange = {},
-        onLogin = {},
-        isLoggingIn = false,
-        loginError = null,
-        onClearLoginError = {},
-        isLoggedIn = false,
-        onSkip = {}
-    )
+    NekoFeedTheme {
+        LoginPage(
+            loginUsername = "",
+            onLoginUsernameChange = {},
+            loginPassword = "",
+            onLoginPasswordChange = {},
+            onLogin = {},
+            isLoggingIn = false,
+            loginError = null,
+            onClearLoginError = {},
+            isLoggedIn = false,
+            onSkip = {}
+        )
+    }
 }

@@ -65,6 +65,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -201,20 +202,21 @@ private fun HeroMediaSection(
     onFullscreenToggle: (Boolean) -> Unit
 ) {
     val context = LocalContext.current
+    val isInspectionMode = LocalInspectionMode.current
     val playerManager = remember { PlayerManager.getInstance(context) }
     val playbackError by playerManager.playbackError.collectAsState()
 
     // 当进入详情页且是视频时，自动播放并解除静音
-    LaunchedEffect(item.id) {
-        if (item.isVideo) {
+    LaunchedEffect(item.id, isInspectionMode) {
+        if (item.isVideo && !isInspectionMode) {
             playerManager.play(item.mediaUrl, ownerId = item.id)
             playerManager.setMute(false)
         }
     }
 
-    DisposableEffect(item.id) {
+    DisposableEffect(item.id, isInspectionMode) {
         onDispose {
-            if (item.isVideo) {
+            if (item.isVideo && !isInspectionMode) {
                 playerManager.pause(ownerId = item.id)
                 playerManager.setMute(true)
             }
@@ -228,7 +230,7 @@ private fun HeroMediaSection(
             .background(Color.Black),
         contentAlignment = Alignment.Center
     ) {
-        if (item.isVideo && playbackError == null) {
+        if (item.isVideo && playbackError == null && !isInspectionMode) {
             AndroidView(
                 factory = { ctx ->
                     androidx.media3.ui.PlayerView(ctx).apply {
