@@ -38,13 +38,17 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -85,32 +89,21 @@ fun FeedScreen(
     val uiState by viewModel.uiState.collectAsState()
     val playingItemId by viewModel.playingItemId.collectAsState()
 
+    LaunchedEffect(viewModel) {
+        viewModel.refreshOnEnter()
+    }
+
     // 使用 remember 缓存 lambda，避免每次重组创建新实例
     val handleItemClick = remember<(String) -> Unit> {
-        { itemId ->
-            viewModel.recordClick(itemId)
-            onItemClick(itemId)
-        }
+        { itemId -> onItemClick(itemId) }
     }
 
     val handleLikeClick = remember<(String) -> Unit> {
-        { itemId ->
-            if (isLoggedIn) {
-                viewModel.toggleLike(itemId)
-            } else {
-                onLogin()
-            }
-        }
+        { itemId -> viewModel.toggleLike(itemId) }
     }
 
     val handleCollectClick = remember<(String) -> Unit> {
-        { itemId ->
-            if (isLoggedIn) {
-                viewModel.toggleCollect(itemId)
-            } else {
-                onLogin()
-            }
-        }
+        { itemId -> viewModel.toggleCollect(itemId) }
     }
 
     FeedScreenContent(
@@ -156,6 +149,7 @@ fun FeedScreenContent(
     onPlayingItemChange: (String?) -> Unit
 ) {
     val listState = rememberLazyListState()
+    val pullToRefreshState = rememberPullToRefreshState()
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier.fillMaxSize()
@@ -229,6 +223,14 @@ fun FeedScreenContent(
         PullToRefreshBox(
             isRefreshing = uiState.isRefreshing,
             onRefresh = onRefresh,
+            state = pullToRefreshState,
+            indicator = {
+                PullToRefreshDefaults.LoadingIndicator(
+                    state = pullToRefreshState,
+                    isRefreshing = uiState.isRefreshing,
+                    modifier = Modifier.align(Alignment.TopCenter)
+                )
+            },
             modifier = Modifier.weight(1f).fillMaxWidth()
         ) {
             when {
@@ -400,10 +402,24 @@ private fun FeedContent(
     // Lifecycle observer to pause video when app goes to background
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     val currentOnPlayingItemChange by rememberUpdatedState(onPlayingItemChange)
+    var isLifecycleResumed by remember(lifecycleOwner) {
+        mutableStateOf(
+            lifecycleOwner.lifecycle.currentState.isAtLeast(
+                androidx.lifecycle.Lifecycle.State.RESUMED
+            )
+        )
+    }
     DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_PAUSE) {
-                currentOnPlayingItemChange(null)
+            when (event) {
+                androidx.lifecycle.Lifecycle.Event.ON_RESUME -> {
+                    isLifecycleResumed = true
+                }
+                androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> {
+                    isLifecycleResumed = false
+                    currentOnPlayingItemChange(null)
+                }
+                else -> Unit
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -420,7 +436,9 @@ private fun FeedContent(
     // Expensive viewport work runs only after scrolling has fully stopped. This
     // avoids creating PlayerView, starting playback, and scheduling AI work while
     // LazyColumn is trying to meet frame deadlines.
-    LaunchedEffect(listState, isAiEnabled) {
+    LaunchedEffect(listState, isAiEnabled, isLifecycleResumed) {
+        if (!isLifecycleResumed) return@LaunchedEffect
+
         snapshotFlow { listState.isScrollInProgress }
             .distinctUntilChanged()
             .collectLatest { isScrolling ->
@@ -445,7 +463,18 @@ private fun FeedContent(
                     }
                     ?.key as? String
 
-                currentOnPlayingItemChange(focusedId)
+                val playingVideoId = visibleItems
+                    .filter { itemInfo ->
+                        val itemId = itemInfo.key as? String
+                        val item = itemId?.let(currentItemMap::get)
+                        item?.isVideo == true && !item.mediaUrl.isNullOrBlank()
+                    }
+                    .minByOrNull { itemInfo ->
+                        kotlin.math.abs(itemInfo.offset + itemInfo.size / 2 - viewportCenter)
+                    }
+                    ?.key as? String
+
+                currentOnPlayingItemChange(playingVideoId)
                 if (isAiEnabled && focusedId != null) {
                     currentItemMap[focusedId]?.let(currentOnAiRequest)
                 }

@@ -4,16 +4,21 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.ico.nekofeed.data.local.TokenManager
+import com.ico.nekofeed.data.local.db.FeedItemInteractionEntity
 import com.ico.nekofeed.data.local.db.NekoFeedDatabase
 import com.ico.nekofeed.data.model.FeedCategory
 import com.ico.nekofeed.data.model.FeedItem
+import com.ico.nekofeed.data.model.ItemInteraction
 import com.ico.nekofeed.data.remote.RetrofitClient
 import com.ico.nekofeed.data.repository.AiRepository
 import com.ico.nekofeed.data.repository.FeedRepository
+import com.ico.nekofeed.data.repository.InteractionSyncStore
 import com.ico.nekofeed.data.repository.InteractionType
 import com.ico.nekofeed.data.repository.UserProfileRepository
 import com.ico.nekofeed.data.repository.UserRepository
 import com.ico.nekofeed.util.FeedUiState
+import com.ico.nekofeed.util.matchesCategory
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,11 +29,16 @@ import kotlinx.coroutines.sync.withPermit
 
 class FeedViewModel(application: Application) : AndroidViewModel(application) {
     private val tokenManager = TokenManager(application)
-    private val repository = FeedRepository(RetrofitClient.feedApi, tokenManager)
-    private val userRepository = UserRepository(RetrofitClient.feedApi)
+    private val repository = FeedRepository(
+        feedApiProvider = { RetrofitClient.feedApi },
+        tokenManager = tokenManager
+    )
+    private val userRepository = UserRepository { RetrofitClient.feedApi }
     private val database = NekoFeedDatabase.getInstance(application)
     val aiRepository = AiRepository(tokenManager, database.aiCacheDao())
     private val userProfileRepository = UserProfileRepository(database.userProfileDao())
+    private val interactionDao = database.feedItemInteractionDao()
+    private val analyticsDao = database.feedAnalyticsDao()
 
     private val _uiState = MutableStateFlow(FeedUiState())
     val uiState: StateFlow<FeedUiState> = _uiState.asStateFlow()
@@ -41,14 +51,16 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
     private val pageSize = 20
     private var currentOffset = 0
     private var totalServerItems = Int.MAX_VALUE
+    private var feedLoadJob: Job? = null
+    private var loadedSourceSignature: String? = null
 
     private val exposedItems = mutableSetOf<String>()
 
     fun getAllItems(): List<FeedItem> = allItems
 
     init {
-        loadFeed()
         observeLlmConfig()
+        observeInteractionUpdates()
     }
 
     private fun observeLlmConfig() {
@@ -60,38 +72,60 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun loadFeed() {
-        viewModelScope.launch {
+        startFeedLoad(clearExisting = true, showInitialLoading = true)
+    }
+
+    private fun startFeedLoad(
+        clearExisting: Boolean,
+        showInitialLoading: Boolean = false
+    ) {
+        feedLoadJob?.cancel()
+        feedLoadJob = viewModelScope.launch {
             currentOffset = 0
             totalServerItems = Int.MAX_VALUE
-            _uiState.update { it.copy(isLoading = true, errorMessage = null, usingFallback = false, hasMore = true) }
+            if (clearExisting) {
+                allItems = emptyList()
+                _playingItemId.value = null
+            }
+            _uiState.update {
+                it.copy(
+                    isLoading = showInitialLoading,
+                    isRefreshing = !showInitialLoading,
+                    items = if (clearExisting) emptyList() else it.items,
+                    errorMessage = null,
+                    usingFallback = false,
+                    hasMore = true
+                )
+            }
 
             val category = _uiState.value.selectedCategory
             val categoryParam = if (category == FeedCategory.FEATURED) null else category.value
 
             repository.loadFeed(category = categoryParam, limit = pageSize, offset = 0).fold(
                 onSuccess = { items ->
-                    allItems = items
-                    currentOffset = items.size
-                    val hasMore = items.size >= pageSize
+                    val mergedItems = mergeLocalState(items)
+                    allItems = mergedItems
+                    currentOffset = mergedItems.size
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            items = items,
+                            isRefreshing = false,
+                            items = mergedItems,
                             errorMessage = null,
                             usingFallback = false,
-                            hasMore = hasMore
+                            hasMore = mergedItems.size >= pageSize
                         )
                     }
-                    batchGenerateAi(items)
+                    batchGenerateAi(mergedItems)
                 },
                 onFailure = { error ->
-                    val fallbackItems = repository.getFallbackData()
+                    val fallbackItems = mergeLocalState(repository.getFallbackData())
                     allItems = fallbackItems
-                    val filteredItems = filterByCategory(fallbackItems, category)
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            items = filteredItems,
+                            isRefreshing = false,
+                            items = filterByCategory(fallbackItems, category),
                             errorMessage = "无法连接服务器: ${error.message}",
                             usingFallback = true,
                             hasMore = false
@@ -104,7 +138,13 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun loadMore() {
-        if (_uiState.value.isLoadingMore || !_uiState.value.hasMore || _uiState.value.usingFallback) return
+        if (
+            _uiState.value.isLoading ||
+            _uiState.value.isRefreshing ||
+            _uiState.value.isLoadingMore ||
+            !_uiState.value.hasMore ||
+            _uiState.value.usingFallback
+        ) return
 
         viewModelScope.launch {
             _uiState.update { it.copy(isLoadingMore = true) }
@@ -117,12 +157,17 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
                     if (newItems.isEmpty()) {
                         _uiState.update { it.copy(isLoadingMore = false, hasMore = false) }
                     } else {
-                        allItems = allItems + newItems
-                        currentOffset += newItems.size
-                        val hasMore = newItems.size >= pageSize
-                        val filteredItems = if (category == FeedCategory.FEATURED) allItems else filterByCategory(allItems, category)
-                        _uiState.update { it.copy(isLoadingMore = false, items = filteredItems, hasMore = hasMore) }
-                        batchGenerateAi(newItems)
+                        val mergedItems = mergeLocalState(newItems)
+                        allItems = (allItems + mergedItems).distinctBy { it.id }
+                        currentOffset += mergedItems.size
+                        _uiState.update {
+                            it.copy(
+                                isLoadingMore = false,
+                                items = allItems,
+                                hasMore = mergedItems.size >= pageSize
+                            )
+                        }
+                        batchGenerateAi(mergedItems)
                     }
                 },
                 onFailure = { error ->
@@ -138,44 +183,18 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun refresh() {
+        startFeedLoad(clearExisting = false)
+    }
+
+    fun refreshOnEnter() {
         viewModelScope.launch {
-            currentOffset = 0
-            totalServerItems = Int.MAX_VALUE
-            _uiState.update { it.copy(isRefreshing = true, hasMore = true) }
-
-            val category = _uiState.value.selectedCategory
-            val categoryParam = if (category == FeedCategory.FEATURED) null else category.value
-
-            repository.loadFeed(category = categoryParam, limit = pageSize, offset = 0).fold(
-                onSuccess = { items ->
-                    allItems = items
-                    currentOffset = items.size
-                    val hasMore = items.size >= pageSize
-                    _uiState.update {
-                        it.copy(
-                            isRefreshing = false,
-                            items = items,
-                            errorMessage = null,
-                            usingFallback = false,
-                            hasMore = hasMore
-                        )
-                    }
-                    batchGenerateAi(items)
-                },
-                onFailure = { error ->
-                    val fallbackItems = repository.getFallbackData()
-                    allItems = fallbackItems
-                    val filteredItems = filterByCategory(fallbackItems, category)
-                    _uiState.update {
-                        it.copy(
-                            isRefreshing = false,
-                            items = filteredItems,
-                            errorMessage = "刷新失败: ${error.message}",
-                            usingFallback = true,
-                            hasMore = false
-                        )
-                    }
-                }
+            val sourceSignature =
+                "${tokenManager.isMockMode()}|${tokenManager.getServerConfig().baseUrl}"
+            val sourceChanged = sourceSignature != loadedSourceSignature
+            loadedSourceSignature = sourceSignature
+            startFeedLoad(
+                clearExisting = sourceChanged,
+                showInitialLoading = allItems.isEmpty()
             )
         }
     }
@@ -275,13 +294,26 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectCategory(category: FeedCategory) {
-        _uiState.update { it.copy(selectedCategory = category) }
-        val filteredItems = filterByCategory(allItems, category)
-        _uiState.update { it.copy(items = filteredItems) }
+        if (_uiState.value.selectedCategory == category) return
+        _uiState.update {
+            it.copy(
+                selectedCategory = category,
+                selectedTags = emptyList()
+            )
+        }
+        exposedItems.clear()
+        startFeedLoad(clearExisting = true, showInitialLoading = true)
     }
 
     fun setPlayingItemId(id: String?) {
+        val previousId = _playingItemId.value
         _playingItemId.value = id
+        if (id != null && id != previousId) {
+            allItems = allItems.map { item ->
+                if (item.id == id) item.copy(playCount = item.playCount + 1) else item
+            }
+            incrementAnalytics(id, AnalyticsEvent.PLAY)
+        }
     }
 
     fun toggleLike(itemId: String) {
@@ -304,25 +336,20 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
         }
         updateFilteredItems()
 
-        // 服务端同步（不区分登录/匿名，都走 API）
         viewModelScope.launch {
+            if (tokenManager.isMockMode()) {
+                allItems.firstOrNull { it.id == itemId }?.let {
+                    saveAndPublishInteraction(it)
+                }
+                return@launch
+            }
+
             userRepository.toggleLike(itemId).fold(
                 onSuccess = { interaction ->
-                    // 用服务端权威值覆盖
-                    allItems = allItems.map { item ->
-                        if (item.id == itemId) {
-                            item.copy(
-                                isLiked = interaction.isLiked,
-                                likeCount = interaction.likeCount,
-                                isCollected = interaction.isCollected,
-                                collectCount = interaction.collectCount
-                            )
-                        } else item
-                    }
-                    updateFilteredItems()
+                    applyInteraction(itemId, interaction)
+                    saveAndPublishInteraction(itemId, interaction)
                 },
                 onFailure = {
-                    // 回滚
                     allItems = snapshot
                     updateFilteredItems()
                 }
@@ -350,25 +377,20 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
         }
         updateFilteredItems()
 
-        // 服务端同步（不区分登录/匿名，都走 API）
         viewModelScope.launch {
+            if (tokenManager.isMockMode()) {
+                allItems.firstOrNull { it.id == itemId }?.let {
+                    saveAndPublishInteraction(it)
+                }
+                return@launch
+            }
+
             userRepository.toggleCollect(itemId).fold(
                 onSuccess = { interaction ->
-                    // 用服务端权威值覆盖
-                    allItems = allItems.map { item ->
-                        if (item.id == itemId) {
-                            item.copy(
-                                isLiked = interaction.isLiked,
-                                likeCount = interaction.likeCount,
-                                isCollected = interaction.isCollected,
-                                collectCount = interaction.collectCount
-                            )
-                        } else item
-                    }
-                    updateFilteredItems()
+                    applyInteraction(itemId, interaction)
+                    saveAndPublishInteraction(itemId, interaction)
                 },
                 onFailure = {
-                    // 回滚
                     allItems = snapshot
                     updateFilteredItems()
                 }
@@ -390,6 +412,7 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
             } else item
         }
         updateFilteredItems()
+        incrementAnalytics(itemId, AnalyticsEvent.SHARE)
     }
 
     fun filterByTag(tag: String) {
@@ -414,7 +437,7 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
                 item.copy(exposureCount = item.exposureCount + 1)
             } else item
         }
-        // 移除 updateFilteredItems()，避免滑动时频繁重组
+        incrementAnalytics(itemId, AnalyticsEvent.EXPOSURE)
     }
 
     fun recordClick(itemId: String) {
@@ -424,9 +447,14 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
                 item.copy(clickCount = item.clickCount + 1)
             } else item
         }
-        // 移除 updateFilteredItems()，避免频繁重组
+        incrementAnalytics(itemId, AnalyticsEvent.CLICK)
 
         viewModelScope.launch {
+            allItems.firstOrNull { it.id == itemId }?.let {
+                userProfileRepository.recordInteraction(it, InteractionType.CLICK)
+            }
+            recordLocalHistory(itemId)
+            if (tokenManager.isMockMode()) return@launch
             userRepository.recordHistory(itemId)
         }
     }
@@ -482,15 +510,7 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun filterByCategory(items: List<FeedItem>, category: FeedCategory): List<FeedItem> {
-        return when (category) {
-            FeedCategory.FEATURED -> items
-            else -> items.filter { item ->
-                item.category == category.value ||
-                item.itemType == category.value ||
-                (category == FeedCategory.VIDEO && item.isVideo) ||
-                (category == FeedCategory.SHOPPING && (item.itemType == "product" || item.itemType == "ad"))
-            }
-        }
+        return items.filter { it.matchesCategory(category) }
     }
 
     private fun updateFilteredItems() {
@@ -503,5 +523,111 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         _uiState.update { it.copy(items = filtered) }
+    }
+
+    private suspend fun mergeLocalState(items: List<FeedItem>): List<FeedItem> {
+        val analytics = analyticsDao.getAll().associateBy { it.itemId }
+        val interactions = if (tokenManager.isMockMode()) {
+            interactionDao.getAllInteractions().associateBy { it.itemId }
+        } else {
+            emptyMap()
+        }
+
+        return items.map { item ->
+            val localAnalytics = analytics[item.id]
+            val localInteraction = interactions[item.id]
+            item.copy(
+                isLiked = localInteraction?.isLiked ?: item.isLiked,
+                isCollected = localInteraction?.isCollected ?: item.isCollected,
+                likeCount = localInteraction?.likeCount ?: item.likeCount,
+                collectCount = localInteraction?.collectCount ?: item.collectCount,
+                exposureCount = item.exposureCount + (localAnalytics?.exposureCount ?: 0),
+                clickCount = item.clickCount + (localAnalytics?.clickCount ?: 0),
+                shareCount = item.shareCount + (localAnalytics?.shareCount ?: 0),
+                playCount = item.playCount + (localAnalytics?.playCount ?: 0)
+            )
+        }
+    }
+
+    private fun observeInteractionUpdates() {
+        viewModelScope.launch {
+            InteractionSyncStore.updates.collect { update ->
+                applyInteraction(update.itemId, update.interaction)
+            }
+        }
+    }
+
+    private fun applyInteraction(itemId: String, interaction: ItemInteraction) {
+        allItems = allItems.map { item ->
+            if (item.id == itemId) {
+                item.copy(
+                    isLiked = interaction.isLiked,
+                    isCollected = interaction.isCollected,
+                    likeCount = interaction.likeCount,
+                    collectCount = interaction.collectCount
+                )
+            } else {
+                item
+            }
+        }
+        updateFilteredItems()
+    }
+
+    private suspend fun saveAndPublishInteraction(item: FeedItem) {
+        saveAndPublishInteraction(
+            item.id,
+            ItemInteraction(
+                isLiked = item.isLiked,
+                isCollected = item.isCollected,
+                likeCount = item.likeCount,
+                collectCount = item.collectCount
+            )
+        )
+    }
+
+    private suspend fun saveAndPublishInteraction(
+        itemId: String,
+        interaction: ItemInteraction
+    ) {
+        val existing = interactionDao.getInteraction(itemId)
+        interactionDao.upsertInteraction(
+            FeedItemInteractionEntity(
+                itemId = itemId,
+                isLiked = interaction.isLiked,
+                isCollected = interaction.isCollected,
+                likeCount = interaction.likeCount,
+                collectCount = interaction.collectCount,
+                lastViewedAt = existing?.lastViewedAt
+            )
+        )
+        InteractionSyncStore.publish(itemId, interaction)
+    }
+
+    private suspend fun recordLocalHistory(itemId: String) {
+        val existing = interactionDao.getInteraction(itemId)
+        interactionDao.upsertInteraction(
+            (existing ?: FeedItemInteractionEntity(itemId = itemId)).copy(
+                lastViewedAt = System.currentTimeMillis(),
+                updatedAt = System.currentTimeMillis()
+            )
+        )
+    }
+
+    private fun incrementAnalytics(itemId: String, event: AnalyticsEvent) {
+        viewModelScope.launch {
+            when (event) {
+                AnalyticsEvent.EXPOSURE -> analyticsDao.incrementExposure(itemId)
+                AnalyticsEvent.CLICK -> analyticsDao.incrementClick(itemId)
+                AnalyticsEvent.SHARE -> analyticsDao.incrementShare(itemId)
+                AnalyticsEvent.PLAY -> analyticsDao.incrementPlay(itemId)
+            }
+        }
+    }
+
+    private enum class AnalyticsEvent {
+        EXPOSURE,
+        CLICK,
+        SHARE,
+        PLAY
     }
 }

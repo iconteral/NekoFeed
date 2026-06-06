@@ -55,10 +55,12 @@ class MainActivity : ComponentActivity() {
             cachedToken.set(startupConfig.token)
             cachedDeviceId.set(startupConfig.deviceId)
 
-            val authRepository = AuthRepository(RetrofitClient.feedApi, tokenManager) { newToken ->
-                cachedToken.set(newToken)
-            }
-            val userRepository = UserRepository(RetrofitClient.feedApi)
+            val authRepository = AuthRepository(
+                feedApiProvider = { RetrofitClient.feedApi },
+                tokenManager = tokenManager,
+                onTokenChanged = { newToken -> cachedToken.set(newToken) }
+            )
+            val userRepository = UserRepository { RetrofitClient.feedApi }
             val startDestination =
                 if (startupConfig.onboardingCompleted) "main" else "onboarding"
 

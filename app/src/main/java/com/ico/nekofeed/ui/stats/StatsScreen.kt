@@ -24,6 +24,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Visibility
@@ -86,10 +87,9 @@ import androidx.compose.ui.tooling.preview.Preview
 @Composable
 fun StatsScreen(
     onBack: () -> Unit,
-    getStats: () -> StatsData,
+    stats: StatsData,
     onItemClick: (String) -> Unit
 ) {
-    val stats = remember { getStats() }
     var selectedSortIndex by remember { mutableIntStateOf(0) }
     val sortOptions = listOf("按曝光", "按点赞", "按收藏")
     val sortedItems = remember(stats.topItems, selectedSortIndex) {
@@ -205,7 +205,8 @@ private fun StatOverviewCards(stats: StatsData) {
         StatCardData("总点赞", stats.totalLike, Icons.Filled.Favorite, StatLikeStart, StatLikeEnd),
         StatCardData("总收藏", stats.totalCollect, Icons.Filled.Bookmark, StatFavoriteStart, StatFavoriteEnd),
         StatCardData("总分享", stats.totalShare, Icons.Filled.Share, StatShareStart, StatShareEnd),
-        StatCardData("CTR", (stats.ctr * 100).toInt(), Icons.AutoMirrored.Filled.TrendingUp, StatCtrStart, StatCtrEnd)
+        StatCardData("CTR", (stats.ctr * 100).toInt(), Icons.AutoMirrored.Filled.TrendingUp, StatCtrStart, StatCtrEnd),
+        StatCardData("总播放", stats.totalPlay, Icons.Filled.PlayArrow, StatClickStart, StatClickEnd)
     )
 
     Column(
@@ -225,6 +226,10 @@ private fun StatOverviewCards(stats: StatsData) {
                 modifier = Modifier.weight(1f)
             )
         }
+        StatCard(
+            data = statCards[6],
+            modifier = Modifier.fillMaxWidth()
+        )
         // 第二行
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -507,18 +512,16 @@ fun StatsScreenPreview() {
     MaterialTheme {
         StatsScreen(
             onBack = {},
-            getStats = {
-                StatsData(
-                    totalExposure = 25600,
-                    totalClick = 3890,
-                    totalLike = 4520,
-                    totalCollect = 1870,
-                    totalShare = 780,
-                    totalPlay = 8200,
-                    ctr = 0.152f,
-                    topItems = com.ico.nekofeed.data.local.FallbackFeedData.items.take(5)
-                )
-            },
+            stats = StatsData(
+                totalExposure = 25600,
+                totalClick = 3890,
+                totalLike = 4520,
+                totalCollect = 1870,
+                totalShare = 780,
+                totalPlay = 8200,
+                ctr = 0.152f,
+                topItems = com.ico.nekofeed.data.local.FallbackFeedData.items.take(5)
+            ),
             onItemClick = {}
         )
     }

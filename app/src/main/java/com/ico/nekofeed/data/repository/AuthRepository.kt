@@ -9,10 +9,16 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withContext
 
 class AuthRepository(
-    private val feedApi: FeedApi,
+    private val feedApiProvider: () -> FeedApi,
     private val tokenManager: TokenManager,
     private val onTokenChanged: ((String?) -> Unit)? = null
 ) {
+    constructor(
+        feedApi: FeedApi,
+        tokenManager: TokenManager,
+        onTokenChanged: ((String?) -> Unit)? = null
+    ) : this({ feedApi }, tokenManager, onTokenChanged)
+
     val token = tokenManager.token
     val username = tokenManager.username
 
@@ -30,7 +36,7 @@ class AuthRepository(
     suspend fun register(username: String, password: String): Result<TokenResponse> {
         return withContext(Dispatchers.IO) {
             try {
-                val response = feedApi.register(mapOf("username" to username, "password" to password))
+                val response = feedApiProvider().register(mapOf("username" to username, "password" to password))
                 tokenManager.saveToken(response.accessToken)
                 tokenManager.saveUsername(username)
                 onTokenChanged?.invoke(response.accessToken)
@@ -44,7 +50,7 @@ class AuthRepository(
     suspend fun login(username: String, password: String): Result<TokenResponse> {
         return withContext(Dispatchers.IO) {
             try {
-                val response = feedApi.login(mapOf("username" to username, "password" to password))
+                val response = feedApiProvider().login(mapOf("username" to username, "password" to password))
                 tokenManager.saveToken(response.accessToken)
                 tokenManager.saveUsername(username)
                 onTokenChanged?.invoke(response.accessToken)
@@ -58,7 +64,7 @@ class AuthRepository(
     suspend fun getMe(): Result<User> {
         return withContext(Dispatchers.IO) {
             try {
-                val user = feedApi.getMe()
+                val user = feedApiProvider().getMe()
                 Result.success(user)
             } catch (e: Exception) {
                 Result.failure(e)
@@ -72,7 +78,7 @@ class AuthRepository(
                 val body = mutableMapOf<String, String>()
                 avatar?.let { body["avatar"] = it }
                 bio?.let { body["bio"] = it }
-                val user = feedApi.updateMe(body)
+                val user = feedApiProvider().updateMe(body)
                 Result.success(user)
             } catch (e: Exception) {
                 Result.failure(e)
@@ -83,7 +89,7 @@ class AuthRepository(
     suspend fun changePassword(oldPassword: String, newPassword: String): Result<String> {
         return withContext(Dispatchers.IO) {
             try {
-                val response = feedApi.changePassword(
+                val response = feedApiProvider().changePassword(
                     mapOf("old_password" to oldPassword, "new_password" to newPassword)
                 )
                 Result.success(response["message"] ?: "Password changed")

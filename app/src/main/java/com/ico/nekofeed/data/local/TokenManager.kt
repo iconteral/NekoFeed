@@ -7,6 +7,9 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import com.ico.nekofeed.data.model.FeedItem
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -34,6 +37,7 @@ data class StartupConfig(
 )
 
 class TokenManager(private val context: Context) {
+    private val gson = Gson()
 
     companion object {
         private val TOKEN_KEY = stringPreferencesKey("auth_token")
@@ -174,4 +178,21 @@ class TokenManager(private val context: Context) {
     suspend fun isMockMode(): Boolean {
         return context.dataStore.data.first()[USE_MOCK_MODE_KEY] ?: false
     }
+
+    suspend fun saveCachedFeed(category: String?, items: List<FeedItem>) {
+        context.dataStore.edit { preferences ->
+            preferences[cachedFeedKey(category)] = gson.toJson(items)
+        }
+    }
+
+    suspend fun getCachedFeed(category: String?): List<FeedItem> {
+        val json = context.dataStore.data.first()[cachedFeedKey(category)] ?: return emptyList()
+        return runCatching {
+            val type = object : TypeToken<List<FeedItem>>() {}.type
+            gson.fromJson<List<FeedItem>>(json, type).orEmpty()
+        }.getOrDefault(emptyList())
+    }
+
+    private fun cachedFeedKey(category: String?) =
+        stringPreferencesKey("cached_feed_${category ?: "featured"}")
 }

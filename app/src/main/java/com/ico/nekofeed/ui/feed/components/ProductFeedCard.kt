@@ -323,6 +323,29 @@ fun ProductFeedCard(
                 }
             }
 
+            if (!item.ctaText.isNullOrBlank() && !item.sourceUrl.isNullOrBlank()) {
+                Button(
+                    onClick = {
+                        com.ico.nekofeed.util.IntentUtils.openUrl(context, item.sourceUrl)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.ShoppingCart,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.size(8.dp))
+                    Text(item.ctaText)
+                }
+            }
+
             // CTA 按钮
 //            if (item.ctaText != null) {
 //                var menuExpanded by remember { mutableStateOf(false) }

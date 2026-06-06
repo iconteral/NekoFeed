@@ -26,15 +26,15 @@ object ExpressiveTokens {
 
 private val DarkColorScheme = darkColorScheme(
     primary = PrimaryLight,
-    onPrimary = DarkOnBackground,
+    onPrimary = PrimaryDark,
     primaryContainer = PrimaryDark,
     onPrimaryContainer = PrimaryLight,
     secondary = SecondaryLight,
-    onSecondary = DarkOnBackground,
+    onSecondary = SecondaryDark,
     secondaryContainer = SecondaryDark,
     onSecondaryContainer = SecondaryLight,
     tertiary = TertiaryLight,
-    onTertiary = DarkOnBackground,
+    onTertiary = TertiaryDark,
     background = DarkBackground,
     onBackground = DarkOnBackground,
     surface = DarkSurface,
