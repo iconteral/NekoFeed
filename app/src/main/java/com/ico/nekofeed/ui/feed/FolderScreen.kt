@@ -74,7 +74,9 @@ import com.ico.nekofeed.data.local.FallbackFeedData
 import com.ico.nekofeed.data.model.FeedCategory
 import com.ico.nekofeed.data.model.FeedItem
 import com.ico.nekofeed.ui.feed.components.FeedItemCard
+import com.ico.nekofeed.ui.feed.components.FeedTagChip
 import com.ico.nekofeed.util.FeedUiState
+import coil.compose.AsyncImage
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.delay
@@ -82,7 +84,6 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import androidx.compose.ui.unit.sp
 private val NotoEmojiFont = FontFamily(Font(resId = R.font.noto_emoji_regular))
-private val NotoColorEmojiFont = FontFamily(Font(resId = R.font.noto_color_emoji_regular))
 private val FeedCategories = listOf(
     FeedCategory.FEATURED,
     FeedCategory.SHOPPING,
@@ -221,10 +222,10 @@ fun FeedScreenContent(
 //                            tint = Color.White,
 //                            modifier = Modifier.size(14.dp)
 //                        )
-                        Text(
-                            text = "\uD83D\uDC31",
-                            fontSize = 25.sp,
-                            fontFamily = NotoColorEmojiFont,
+                        AsyncImage(
+                            model = R.raw.neko_cat,
+                            contentDescription = null,
+                            modifier = Modifier.size(25.dp)
                         )
                     }
                     Spacer(modifier = Modifier.width(8.dp))
@@ -259,7 +260,7 @@ fun FeedScreenContent(
         )
 
         // 3. AI 搜索提示条
-        AISearchBar(onClick = onSearchClick)
+//        AISearchBar(onClick = onSearchClick)
 
         // 4. 信息流列表
         FeedTagFilter(
@@ -386,10 +387,10 @@ private fun FeedTagFilter(
         }
 
         items(availableTags, key = { "tag-$it" }) { tag ->
-            FilterChip(
-                selected = tag in selectedTags,
+            FeedTagChip(
+                tag = tag,
                 onClick = { onTagClick(tag) },
-                label = { Text(tag) }
+                selected = tag in selectedTags
             )
         }
 
@@ -439,43 +440,43 @@ private fun FeedTabRow(
         }
     }
 }
-
-@Composable
-private fun AISearchBar(onClick: () -> Unit) {
-    Card(
-        onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.12f)
-        ),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = 0.dp
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Star,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(16.dp)
-            )
-            Text(
-                text = "告诉 AI 你想看什么内容...",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
-    }
-}
+//
+//@Composable
+//private fun AISearchBar(onClick: () -> Unit) {
+//    Card(
+//        onClick = onClick,
+//        modifier = Modifier
+//            .fillMaxWidth()
+//            .padding(horizontal = 16.dp, vertical = 8.dp),
+//        shape = RoundedCornerShape(24.dp),
+//        colors = CardDefaults.cardColors(
+//            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.12f)
+//        ),
+//        elevation = CardDefaults.cardElevation(
+//            defaultElevation = 0.dp
+//        )
+//    ) {
+//        Row(
+//            modifier = Modifier
+//                .fillMaxWidth()
+//                .padding(horizontal = 16.dp, vertical = 12.dp),
+//            verticalAlignment = Alignment.CenterVertically,
+//            horizontalArrangement = Arrangement.spacedBy(8.dp)
+//        ) {
+//            Icon(
+//                imageVector = Icons.Filled.Star,
+//                contentDescription = null,
+//                tint = MaterialTheme.colorScheme.primary,
+//                modifier = Modifier.size(16.dp)
+//            )
+//            Text(
+//                text = "告诉 AI 你想看什么内容...",
+//                style = MaterialTheme.typography.bodyMedium,
+//                color = MaterialTheme.colorScheme.primary
+//            )
+//        }
+//    }
+//}
 
 @Composable
 private fun FeedContent(
@@ -740,6 +741,7 @@ private fun ErrorContent(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Preview(showBackground = true)
 @Composable
 fun FeedScreenPreview() {

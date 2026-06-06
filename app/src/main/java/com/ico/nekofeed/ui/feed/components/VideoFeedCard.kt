@@ -45,6 +45,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -73,6 +74,7 @@ fun VideoFeedCard(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val isInspectionMode = LocalInspectionMode.current
     val playerManager = remember(context) { PlayerManager.getInstance(context) }
     val playbackState by playerManager.playbackState.collectAsState()
     var isMuted by remember { mutableStateOf(true) }
@@ -82,16 +84,16 @@ fun VideoFeedCard(
     val isBuffering =
         isPlaying && ownPlaybackState?.status == VideoPlaybackStatus.BUFFERING
 
-    LaunchedEffect(isPlaying, item.mediaUrl) {
-        if (isPlaying) {
+    LaunchedEffect(isPlaying, item.mediaUrl, isInspectionMode) {
+        if (isPlaying && !isInspectionMode) {
             playerManager.play(item.mediaUrl, ownerId = item.id)
             isMuted = playerManager.isMuted
         }
     }
 
-    DisposableEffect(isPlaying, item.id, playerManager) {
+    DisposableEffect(isPlaying, item.id, playerManager, isInspectionMode) {
         onDispose {
-            if (isPlaying) {
+            if (isPlaying && !isInspectionMode) {
                 playerManager.pause(ownerId = item.id)
             }
         }
@@ -105,7 +107,7 @@ fun VideoFeedCard(
                 .height(260.dp)
                 .background(Color.Black)
         ) {
-            if (isPlaying && !hasPlaybackError) {
+            if (isPlaying && !hasPlaybackError && !isInspectionMode) {
                 AndroidView(
                     factory = { ctx ->
                         androidx.media3.ui.PlayerView(ctx).apply {

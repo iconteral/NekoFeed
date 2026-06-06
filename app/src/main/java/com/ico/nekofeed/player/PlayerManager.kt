@@ -32,7 +32,7 @@ data class VideoPlaybackState(
 )
 
 @OptIn(UnstableApi::class)
-class PlayerManager private constructor(context: Context) {
+class PlayerManager private constructor(private val context: Context) {
 
     companion object {
         @Volatile
@@ -46,7 +46,16 @@ class PlayerManager private constructor(context: Context) {
     }
 
     private var simpleCache: SimpleCache? = null
+    private var _exoPlayer: ExoPlayer? = null
+    
     val exoPlayer: ExoPlayer
+        get() {
+            if (_exoPlayer == null) {
+                _exoPlayer = createExoPlayer()
+            }
+            return _exoPlayer!!
+        }
+
     private var currentMediaUrl: String? = null
     private var playbackOwnerId: String? = null
     private val _playbackError = MutableStateFlow<String?>(null)
@@ -56,13 +65,38 @@ class PlayerManager private constructor(context: Context) {
     var isMuted: Boolean = true
         private set
 
-    init {
+    private val playerListener = object : Player.Listener {
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            val status = when (playbackState) {
+                Player.STATE_BUFFERING -> VideoPlaybackStatus.BUFFERING
+                Player.STATE_READY -> VideoPlaybackStatus.READY
+                else -> VideoPlaybackStatus.IDLE
+            }
+            _playbackState.value = VideoPlaybackState(
+                ownerId = playbackOwnerId,
+                status = status
+            )
+        }
+
+        override fun onPlayerError(error: PlaybackException) {
+            _playbackError.value = error.message ?: "视频加载失败"
+            _playbackState.value = VideoPlaybackState(
+                ownerId = playbackOwnerId,
+                status = VideoPlaybackStatus.ERROR,
+                errorMessage = _playbackError.value
+            )
+        }
+    }
+
+    private fun createExoPlayer(): ExoPlayer {
         val cacheSize: Long = 100 * 1024 * 1024 // 100 MB cache
         val cacheEvictor = LeastRecentlyUsedCacheEvictor(cacheSize)
         val databaseProvider = StandaloneDatabaseProvider(context)
         val cacheDir = File(context.cacheDir, "media3_cache")
 
-        simpleCache = SimpleCache(cacheDir, cacheEvictor, databaseProvider)
+        if (simpleCache == null) {
+            simpleCache = SimpleCache(cacheDir, cacheEvictor, databaseProvider)
+        }
 
         val dataSourceFactory = DefaultDataSource.Factory(context)
         val cacheDataSourceFactory = CacheDataSource.Factory()
@@ -70,36 +104,13 @@ class PlayerManager private constructor(context: Context) {
             .setUpstreamDataSourceFactory(dataSourceFactory)
             .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
 
-        exoPlayer = ExoPlayer.Builder(context)
+        return ExoPlayer.Builder(context)
             .setMediaSourceFactory(DefaultMediaSourceFactory(context).setDataSourceFactory(cacheDataSourceFactory))
-            .build()
-        
-        exoPlayer.repeatMode = Player.REPEAT_MODE_ONE
-        exoPlayer.volume = 0f // 默认静音
-        exoPlayer.addListener(
-            object : Player.Listener {
-                override fun onPlaybackStateChanged(playbackState: Int) {
-                    val status = when (playbackState) {
-                        Player.STATE_BUFFERING -> VideoPlaybackStatus.BUFFERING
-                        Player.STATE_READY -> VideoPlaybackStatus.READY
-                        else -> VideoPlaybackStatus.IDLE
-                    }
-                    _playbackState.value = VideoPlaybackState(
-                        ownerId = playbackOwnerId,
-                        status = status
-                    )
-                }
-
-                override fun onPlayerError(error: PlaybackException) {
-                    _playbackError.value = error.message ?: "视频加载失败"
-                    _playbackState.value = VideoPlaybackState(
-                        ownerId = playbackOwnerId,
-                        status = VideoPlaybackStatus.ERROR,
-                        errorMessage = _playbackError.value
-                    )
-                }
+            .build().apply {
+                repeatMode = Player.REPEAT_MODE_ONE
+                volume = if (isMuted) 0f else 1f
+                addListener(playerListener)
             }
-        )
     }
 
     fun play(mediaUrl: String?, ownerId: String? = null) {
@@ -111,28 +122,30 @@ class PlayerManager private constructor(context: Context) {
             ownerId = ownerId,
             status = VideoPlaybackStatus.BUFFERING
         )
+        
+        val player = exoPlayer
         if (currentMediaUrl != mediaUrl) {
             currentMediaUrl = mediaUrl
             val mediaItem = MediaItem.fromUri(mediaUrl)
-            exoPlayer.setMediaItem(mediaItem)
-            exoPlayer.prepare()
-        } else if (exoPlayer.playerError != null || exoPlayer.playbackState == Player.STATE_IDLE) {
-            exoPlayer.prepare()
+            player.setMediaItem(mediaItem)
+            player.prepare()
+        } else if (player.playerError != null || player.playbackState == Player.STATE_IDLE) {
+            player.prepare()
         }
-        exoPlayer.playWhenReady = true
+        player.playWhenReady = true
     }
 
     fun pause(ownerId: String? = null) {
         if (ownerId != null && playbackOwnerId != ownerId) return
 
-        exoPlayer.pause()
+        _exoPlayer?.pause()
         playbackOwnerId = null
         _playbackState.value = VideoPlaybackState()
     }
 
     fun setMute(muted: Boolean) {
         isMuted = muted
-        exoPlayer.volume = if (muted) 0f else 1f
+        _exoPlayer?.volume = if (muted) 0f else 1f
     }
 
     fun toggleMute() {
@@ -140,7 +153,8 @@ class PlayerManager private constructor(context: Context) {
     }
 
     fun release() {
-        exoPlayer.release()
+        _exoPlayer?.release()
+        _exoPlayer = null
         simpleCache?.release()
         simpleCache = null
         currentMediaUrl = null
