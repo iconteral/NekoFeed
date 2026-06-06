@@ -24,6 +24,7 @@ import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -56,6 +57,7 @@ import com.ico.nekofeed.data.model.FeedItem
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LinearWavyProgressIndicator
 import com.ico.nekofeed.player.PlayerManager
+import com.ico.nekofeed.player.VideoPlaybackStatus
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -72,8 +74,13 @@ fun VideoFeedCard(
 ) {
     val context = LocalContext.current
     val playerManager = remember(context) { PlayerManager.getInstance(context) }
-    val playbackError by playerManager.playbackError.collectAsState()
+    val playbackState by playerManager.playbackState.collectAsState()
     var isMuted by remember { mutableStateOf(true) }
+    val ownPlaybackState = playbackState.takeIf { it.ownerId == item.id }
+    val hasPlaybackError =
+        isPlaying && ownPlaybackState?.status == VideoPlaybackStatus.ERROR
+    val isBuffering =
+        isPlaying && ownPlaybackState?.status == VideoPlaybackStatus.BUFFERING
 
     LaunchedEffect(isPlaying, item.mediaUrl) {
         if (isPlaying) {
@@ -84,7 +91,7 @@ fun VideoFeedCard(
 
     DisposableEffect(isPlaying, item.id, playerManager) {
         onDispose {
-            if (isPlaying && playbackError == null) {
+            if (isPlaying) {
                 playerManager.pause(ownerId = item.id)
             }
         }
@@ -98,7 +105,7 @@ fun VideoFeedCard(
                 .height(260.dp)
                 .background(Color.Black)
         ) {
-            if (isPlaying) {
+            if (isPlaying && !hasPlaybackError) {
                 AndroidView(
                     factory = { ctx ->
                         androidx.media3.ui.PlayerView(ctx).apply {
@@ -115,6 +122,18 @@ fun VideoFeedCard(
                     },
                     modifier = Modifier.fillMaxWidth().height(260.dp)
                 )
+
+                if (isBuffering) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(260.dp)
+                            .background(Color.Black.copy(alpha = 0.24f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = Color.White)
+                    }
+                }
 
                 // 静音控制按钮
                 Box(
@@ -161,7 +180,7 @@ fun VideoFeedCard(
                             )
                         )
                 )
-                if (isPlaying && playbackError != null) {
+                if (hasPlaybackError) {
                     TextButton(
                         onClick = {
                             playerManager.play(item.mediaUrl, ownerId = item.id)
@@ -188,6 +207,19 @@ fun VideoFeedCard(
                         tint = Color.White,
                         modifier = Modifier.size(64.dp)
                     )
+                }
+                if (hasPlaybackError) {
+                    TextButton(
+                        onClick = {
+                            playerManager.play(item.mediaUrl, ownerId = item.id)
+                        },
+                        modifier = Modifier.align(Alignment.Center)
+                    ) {
+                        Text(
+                            text = "视频加载失败，点击重试",
+                            color = Color.White
+                        )
+                    }
                 }
             }
 

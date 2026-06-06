@@ -18,6 +18,19 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+enum class VideoPlaybackStatus {
+    IDLE,
+    BUFFERING,
+    READY,
+    ERROR
+}
+
+data class VideoPlaybackState(
+    val ownerId: String? = null,
+    val status: VideoPlaybackStatus = VideoPlaybackStatus.IDLE,
+    val errorMessage: String? = null
+)
+
 @OptIn(UnstableApi::class)
 class PlayerManager private constructor(context: Context) {
 
@@ -38,6 +51,8 @@ class PlayerManager private constructor(context: Context) {
     private var playbackOwnerId: String? = null
     private val _playbackError = MutableStateFlow<String?>(null)
     val playbackError: StateFlow<String?> = _playbackError.asStateFlow()
+    private val _playbackState = MutableStateFlow(VideoPlaybackState())
+    val playbackState: StateFlow<VideoPlaybackState> = _playbackState.asStateFlow()
     var isMuted: Boolean = true
         private set
 
@@ -63,8 +78,25 @@ class PlayerManager private constructor(context: Context) {
         exoPlayer.volume = 0f // 默认静音
         exoPlayer.addListener(
             object : Player.Listener {
+                override fun onPlaybackStateChanged(playbackState: Int) {
+                    val status = when (playbackState) {
+                        Player.STATE_BUFFERING -> VideoPlaybackStatus.BUFFERING
+                        Player.STATE_READY -> VideoPlaybackStatus.READY
+                        else -> VideoPlaybackStatus.IDLE
+                    }
+                    _playbackState.value = VideoPlaybackState(
+                        ownerId = playbackOwnerId,
+                        status = status
+                    )
+                }
+
                 override fun onPlayerError(error: PlaybackException) {
                     _playbackError.value = error.message ?: "视频加载失败"
+                    _playbackState.value = VideoPlaybackState(
+                        ownerId = playbackOwnerId,
+                        status = VideoPlaybackStatus.ERROR,
+                        errorMessage = _playbackError.value
+                    )
                 }
             }
         )
@@ -75,10 +107,16 @@ class PlayerManager private constructor(context: Context) {
 
         _playbackError.value = null
         playbackOwnerId = ownerId
+        _playbackState.value = VideoPlaybackState(
+            ownerId = ownerId,
+            status = VideoPlaybackStatus.BUFFERING
+        )
         if (currentMediaUrl != mediaUrl) {
             currentMediaUrl = mediaUrl
             val mediaItem = MediaItem.fromUri(mediaUrl)
             exoPlayer.setMediaItem(mediaItem)
+            exoPlayer.prepare()
+        } else if (exoPlayer.playerError != null || exoPlayer.playbackState == Player.STATE_IDLE) {
             exoPlayer.prepare()
         }
         exoPlayer.playWhenReady = true
@@ -89,6 +127,7 @@ class PlayerManager private constructor(context: Context) {
 
         exoPlayer.pause()
         playbackOwnerId = null
+        _playbackState.value = VideoPlaybackState()
     }
 
     fun setMute(muted: Boolean) {
@@ -107,6 +146,7 @@ class PlayerManager private constructor(context: Context) {
         currentMediaUrl = null
         playbackOwnerId = null
         _playbackError.value = null
+        _playbackState.value = VideoPlaybackState()
         instance = null
     }
 }
