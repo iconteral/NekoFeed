@@ -56,3 +56,6 @@ google-services.json
 
 .kotlin
 
+# Large font files
+noto_color_emoji_regular.ttf
+
