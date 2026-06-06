@@ -59,8 +59,10 @@ fun AppNavHost(
         composable("onboarding") {
             OnboardingScreen(
                 onComplete = {
-                    navController.navigate("main") {
-                        popUpTo("onboarding") { inclusive = true }
+                    if (!navController.popBackStack()) {
+                        navController.navigate("main") {
+                            popUpTo("onboarding") { inclusive = true }
+                        }
                     }
                 }
             )
@@ -136,6 +138,7 @@ fun AppNavHost(
                 },
                 onBack = { navController.popBackStack() },
                 onNavigateToAiSettings = { navController.navigate("ai_settings") },
+                onNavigateToOnboarding = { navController.navigate("onboarding") },
                 loadStats = {
                     userRepository.getUserStats().getOrNull()
                 }
@@ -316,6 +319,7 @@ private fun MainScreen(
                     onNavigateToHistory = { nestedNavController.navigate("history") },
                     onBack = { nestedNavController.popBackStack() },
                     onNavigateToAiSettings = { nestedNavController.navigate("ai_settings") },
+                    onNavigateToOnboarding = { navController.navigate("onboarding") },
                     loadStats = {
                         userRepository.getUserStats().getOrNull()
                     }

@@ -9,6 +9,10 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
@@ -37,6 +41,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.Button
@@ -70,11 +75,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ico.nekofeed.ui.theme.AccentBlue
 import com.ico.nekofeed.ui.theme.AccentGreen
@@ -85,7 +94,10 @@ import com.ico.nekofeed.ui.theme.PrimaryLight
 import com.ico.nekofeed.ui.theme.Secondary
 import com.ico.nekofeed.ui.theme.SecondaryDark
 import com.ico.nekofeed.ui.theme.SecondaryLight
+import com.ico.nekofeed.R
 import kotlinx.coroutines.launch
+
+private val NotoColorEmojiFont = FontFamily(Font(resId = R.font.noto_color_emoji_regular))
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class, ExperimentalAnimationApi::class)
 @Composable
@@ -94,8 +106,14 @@ fun OnboardingScreen(
     viewModel: OnboardingViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val pagerState = rememberPagerState(pageCount = { 3 })
+    val pageCount = if (uiState.useMockMode) 3 else 4
+    val pagerState = rememberPagerState(pageCount = { pageCount })
     val coroutineScope = rememberCoroutineScope()
+    val animatedProgress by animateFloatAsState(
+        targetValue = (pagerState.currentPage + 1) / pageCount.toFloat(),
+        animationSpec = tween(durationMillis = 300),
+        label = "progress"
+    )
 
     LaunchedEffect(uiState.isCompleted) {
         if (uiState.isCompleted) {
@@ -166,17 +184,6 @@ fun OnboardingScreen(
                     }
                 }
 
-                LinearProgressIndicator(
-                    progress = { (pagerState.currentPage + 1) / 3f },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 32.dp)
-                        .height(4.dp)
-                        .clip(RoundedCornerShape(2.dp)),
-                    color = Primary,
-                    trackColor = Primary.copy(alpha = 0.2f),
-                )
-
                 Spacer(modifier = Modifier.height(16.dp))
 
                 HorizontalPager(
@@ -200,6 +207,20 @@ fun OnboardingScreen(
                             apiKey = uiState.llmApiKey,
                             onApiKeyChange = viewModel::updateLlmApiKey
                         )
+                        3 -> if (!uiState.useMockMode) {
+                            LoginPage(
+                                loginUsername = uiState.loginUsername,
+                                onLoginUsernameChange = viewModel::updateLoginUsername,
+                                loginPassword = uiState.loginPassword,
+                                onLoginPasswordChange = viewModel::updateLoginPassword,
+                                onLogin = viewModel::login,
+                                isLoggingIn = uiState.isLoggingIn,
+                                loginError = uiState.loginError,
+                                onClearLoginError = viewModel::clearLoginError,
+                                isLoggedIn = uiState.isLoggedIn,
+                                onSkip = { viewModel.completeOnboarding() }
+                            )
+                        }
                     }
                 }
 
@@ -210,31 +231,39 @@ fun OnboardingScreen(
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    repeat(3) { index ->
-                        val isSelected = pagerState.currentPage == index
-                        val width by animateFloatAsState(
-                            targetValue = if (isSelected) 32f else 8f,
-                            animationSpec = spring(dampingRatio = 0.6f),
-                            label = "indicator_width"
-                        )
-                        Box(
-                            modifier = Modifier
-                                .width(width.dp)
-                                .height(8.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(
-                                    if (isSelected) Primary else Primary.copy(alpha = 0.3f)
+                    repeat(4) { index ->
+                        AnimatedVisibility(
+                            visible = index < pageCount,
+                            enter = expandHorizontally() + fadeIn(),
+                            exit = shrinkHorizontally() + fadeOut()
+                        ) {
+                            Row {
+                                val isSelected = pagerState.currentPage == index
+                                val width by animateFloatAsState(
+                                    targetValue = if (isSelected) 32f else 8f,
+                                    animationSpec = spring(dampingRatio = 0.6f),
+                                    label = "indicator_width"
                                 )
-                        )
-                        if (index < 2) {
-                            Spacer(modifier = Modifier.width(8.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .width(width.dp)
+                                        .height(8.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(
+                                            if (isSelected) Primary else Primary.copy(alpha = 0.3f)
+                                        )
+                                )
+                                if (index < pageCount - 1) {
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                }
+                            }
                         }
                     }
                 }
 
                 Button(
                     onClick = {
-                        if (pagerState.currentPage < 2) {
+                        if (pagerState.currentPage < pageCount - 1) {
                             coroutineScope.launch {
                                 pagerState.animateScrollToPage(pagerState.currentPage + 1)
                             }
@@ -257,26 +286,18 @@ fun OnboardingScreen(
                             color = Color.White
                         )
                     } else {
+                        val isLastPage = pagerState.currentPage == pageCount - 1
                         Text(
-                            text = if (pagerState.currentPage < 2) "继续" else "开始使用",
+                            text = if (isLastPage) "开始使用" else "继续",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
-                        if (pagerState.currentPage < 2) {
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        } else {
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(
+                            imageVector = if (isLastPage) Icons.Default.Check else Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                 }
 
@@ -287,7 +308,7 @@ fun OnboardingScreen(
 }
 
 @Composable
-private fun WelcomePage() {
+internal fun WelcomePage() {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -298,24 +319,16 @@ private fun WelcomePage() {
     ) {
         Box(
             modifier = Modifier
-                .size(120.dp)
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(Primary, Secondary)
-                    ),
-                    CircleShape
-                ),
+                .size(120.dp),
+
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = Icons.Default.SmartToy,
-                contentDescription = null,
-                modifier = Modifier.size(64.dp),
-                tint = Color.White
+            Text(
+                text = "😻",
+                fontSize = 64.sp,
+                fontFamily = NotoColorEmojiFont
             )
         }
-
-        Spacer(modifier = Modifier.height(32.dp))
 
         Text(
             text = "欢迎使用 NekoFeed",
@@ -394,7 +407,7 @@ private fun FeatureItem(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun ModeSelectionPage(
+internal fun ModeSelectionPage(
     useMockMode: Boolean,
     onMockModeChange: (Boolean) -> Unit,
     serverUrl: String,
@@ -556,8 +569,8 @@ private fun ModeSelectionPage(
 
         AnimatedVisibility(
             visible = !useMockMode,
-            enter = fadeIn() + slideInHorizontally(),
-            exit = fadeOut() + slideOutHorizontally()
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut()
         ) {
             Column {
                 Spacer(modifier = Modifier.height(24.dp))
@@ -582,7 +595,7 @@ private fun ModeSelectionPage(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun LlmSettingsPage(
+internal fun LlmSettingsPage(
     endpoint: String,
     onEndpointChange: (String) -> Unit,
     model: String,
@@ -703,4 +716,227 @@ private fun LlmSettingsPage(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun OnboardingScreenPreview() {
+    OnboardingScreen(onComplete = {})
+}
+
+@Preview(showBackground = true)
+@Composable
+fun WelcomePagePreview() {
+    WelcomePage()
+}
+
+@Preview(showBackground = true)
+@Composable
+fun ModeSelectionPagePreview() {
+    ModeSelectionPage(
+        useMockMode = false,
+        onMockModeChange = {},
+        serverUrl = "http://10.0.2.2:8000",
+        onServerUrlChange = {}
+    )
+}
+
+@Preview(showBackground = true)
+@Composable
+fun LlmSettingsPagePreview() {
+    LlmSettingsPage(
+        endpoint = "http://localhost:11434/v1",
+        onEndpointChange = {},
+        model = "gpt-4o-mini",
+        onModelChange = {},
+        apiKey = "",
+        onApiKeyChange = {}
+    )
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+internal fun LoginPage(
+    loginUsername: String,
+    onLoginUsernameChange: (String) -> Unit,
+    loginPassword: String,
+    onLoginPasswordChange: (String) -> Unit,
+    onLogin: () -> Unit,
+    isLoggingIn: Boolean,
+    loginError: String?,
+    onClearLoginError: () -> Unit,
+    isLoggedIn: Boolean,
+    onSkip: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .size(80.dp)
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(Primary, AccentBlue)
+                    ),
+                    RoundedCornerShape(20.dp)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Person,
+                contentDescription = null,
+                modifier = Modifier.size(40.dp),
+                tint = Color.White
+            )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Text(
+            text = "登录账号",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.ExtraBold,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "登录后可同步数据和使用更多功能",
+            style = MaterialTheme.typography.bodyLarge,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        if (isLoggedIn) {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = AccentGreen.copy(alpha = 0.1f)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        tint = AccentGreen,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "登录成功！",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = AccentGreen,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        } else {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    OutlinedTextField(
+                        value = loginUsername,
+                        onValueChange = {
+                            onLoginUsernameChange(it)
+                            if (loginError != null) onClearLoginError()
+                        },
+                        label = { Text("用户名") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                        )
+                    )
+
+                    OutlinedTextField(
+                        value = loginPassword,
+                        onValueChange = {
+                            onLoginPasswordChange(it)
+                            if (loginError != null) onClearLoginError()
+                        },
+                        label = { Text("密码") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                        )
+                    )
+
+                    if (loginError != null) {
+                        Text(
+                            text = loginError,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+
+                    Button(
+                        onClick = onLogin,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isLoggingIn,
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Primary)
+                    ) {
+                        if (isLoggingIn) {
+                            LoadingIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = Color.White
+                            )
+                        } else {
+                            Text("登录")
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        TextButton(onClick = onSkip) {
+            Text(
+                text = if (isLoggedIn) "继续" else "跳过登录",
+                style = MaterialTheme.typography.bodyLarge
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun LoginPagePreview() {
+    LoginPage(
+        loginUsername = "",
+        onLoginUsernameChange = {},
+        loginPassword = "",
+        onLoginPasswordChange = {},
+        onLogin = {},
+        isLoggingIn = false,
+        loginError = null,
+        onClearLoginError = {},
+        isLoggedIn = false,
+        onSkip = {}
+    )
 }
