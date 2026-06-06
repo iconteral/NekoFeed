@@ -95,6 +95,7 @@ import com.ico.nekofeed.ui.theme.Secondary
 import com.ico.nekofeed.ui.theme.SecondaryDark
 import com.ico.nekofeed.ui.theme.SecondaryLight
 import com.ico.nekofeed.R
+import com.ico.nekofeed.ui.theme.StatExposureEnd
 import kotlinx.coroutines.launch
 
 private val NotoColorEmojiFont = FontFamily(Font(resId = R.font.noto_color_emoji_regular))
@@ -616,7 +617,7 @@ internal fun LlmSettingsPage(
                 .size(80.dp)
                 .background(
                     Brush.linearGradient(
-                        colors = listOf(Secondary, Primary)
+                        colors = listOf(Primary, StatExposureEnd)
                     ),
                     RoundedCornerShape(20.dp)
                 ),

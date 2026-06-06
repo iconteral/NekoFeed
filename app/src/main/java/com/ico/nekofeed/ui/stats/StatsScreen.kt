@@ -68,19 +68,19 @@ import com.ico.nekofeed.ui.theme.AccentRed
 import com.ico.nekofeed.ui.theme.ExpressiveTokens
 import com.ico.nekofeed.ui.theme.Primary
 import com.ico.nekofeed.ui.theme.Secondary
-import com.ico.nekofeed.ui.theme.StatBlueEnd
-import com.ico.nekofeed.ui.theme.StatBlueStart
-import com.ico.nekofeed.ui.theme.StatGreenEnd
-import com.ico.nekofeed.ui.theme.StatGreenStart
-import com.ico.nekofeed.ui.theme.StatOrangeEnd
-import com.ico.nekofeed.ui.theme.StatOrangeStart
-import com.ico.nekofeed.ui.theme.StatPinkEnd
-import com.ico.nekofeed.ui.theme.StatPinkStart
-import com.ico.nekofeed.ui.theme.StatPurpleEnd
-import com.ico.nekofeed.ui.theme.StatPurpleStart
+import com.ico.nekofeed.ui.theme.StatExposureEnd
+import com.ico.nekofeed.ui.theme.StatExposureStart
+import com.ico.nekofeed.ui.theme.StatClickEnd
+import com.ico.nekofeed.ui.theme.StatClickStart
+import com.ico.nekofeed.ui.theme.StatLikeEnd
+import com.ico.nekofeed.ui.theme.StatLikeStart
+import com.ico.nekofeed.ui.theme.StatFavoriteEnd
+import com.ico.nekofeed.ui.theme.StatFavoriteStart
+import com.ico.nekofeed.ui.theme.StatShareEnd
+import com.ico.nekofeed.ui.theme.StatShareStart
+import com.ico.nekofeed.ui.theme.StatCtrEnd
+import com.ico.nekofeed.ui.theme.StatCtrStart
 import androidx.compose.ui.tooling.preview.Preview
-import com.ico.nekofeed.ui.theme.StatRedEnd
-import com.ico.nekofeed.ui.theme.StatRedStart
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -200,12 +200,12 @@ fun StatsScreen(
 @Composable
 private fun StatOverviewCards(stats: StatsData) {
     val statCards = listOf(
-        StatCardData("总曝光", stats.totalExposure, Icons.Filled.Visibility, StatPurpleStart, StatPurpleEnd),
-        StatCardData("总点击", stats.totalClick, Icons.Filled.Visibility, StatBlueStart, StatBlueEnd),
-        StatCardData("总点赞", stats.totalLike, Icons.Filled.Favorite, StatRedStart, StatRedEnd),
-        StatCardData("总收藏", stats.totalCollect, Icons.Filled.Bookmark, StatOrangeStart, StatOrangeEnd),
-        StatCardData("总分享", stats.totalShare, Icons.Filled.Share, StatGreenStart, StatGreenEnd),
-        StatCardData("CTR", (stats.ctr * 100).toInt(), Icons.AutoMirrored.Filled.TrendingUp, StatPinkStart, StatPinkEnd)
+        StatCardData("总曝光", stats.totalExposure, Icons.Filled.Visibility, StatExposureStart, StatExposureEnd),
+        StatCardData("总点击", stats.totalClick, Icons.Filled.Visibility, StatClickStart, StatClickEnd),
+        StatCardData("总点赞", stats.totalLike, Icons.Filled.Favorite, StatLikeStart, StatLikeEnd),
+        StatCardData("总收藏", stats.totalCollect, Icons.Filled.Bookmark, StatFavoriteStart, StatFavoriteEnd),
+        StatCardData("总分享", stats.totalShare, Icons.Filled.Share, StatShareStart, StatShareEnd),
+        StatCardData("CTR", (stats.ctr * 100).toInt(), Icons.AutoMirrored.Filled.TrendingUp, StatCtrStart, StatCtrEnd)
     )
 
     Column(
@@ -373,7 +373,7 @@ private fun RankingItem(
                     .clip(RoundedCornerShape(10.dp))
                     .background(
                         if (rank <= 3) Brush.linearGradient(
-                            colors = listOf(Primary, Secondary)
+                            colors = listOf(Primary, StatExposureEnd)
                         ) else Brush.linearGradient(
                             colors = listOf(
                                 MaterialTheme.colorScheme.surfaceVariant,
