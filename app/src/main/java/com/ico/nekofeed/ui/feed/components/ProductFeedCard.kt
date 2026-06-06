@@ -338,61 +338,61 @@ fun ProductFeedCard(
             }
 
             // CTA 按钮
-            if (item.ctaText != null) {
-                var menuExpanded by remember { mutableStateOf(false) }
-
-                Box(modifier = Modifier.padding(top = 12.dp)) {
-                    SplitButtonLayout(
-                        leadingButton = {
-                            SplitButtonDefaults.LeadingButton(
-                                onClick = { 
-                                    com.ico.nekofeed.util.IntentUtils.openUrl(context, item.sourceUrl)
-                                }
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.ShoppingCart,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.size(8.dp))
-                                Text(
-                                    text = item.ctaText,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        },
-                        trailingButton = {
-                            SplitButtonDefaults.TrailingButton(
-                                onClick = { menuExpanded = true }
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.KeyboardArrowDown,
-                                    contentDescription = "更多选项"
-                                )
-                            }
-                        }
-                    )
-
-                    DropdownMenu(
-                        expanded = menuExpanded,
-                        onDismissRequest = { menuExpanded = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("加入购物车") },
-                            onClick = { menuExpanded = false }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("联系商家") },
-                            onClick = { menuExpanded = false }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("查看相似推荐") },
-                            onClick = { menuExpanded = false }
-                        )
-                    }
-                }
-            }
+//            if (item.ctaText != null) {
+//                var menuExpanded by remember { mutableStateOf(false) }
+//
+//                Box(modifier = Modifier.padding(top = 12.dp)) {
+//                    SplitButtonLayout(
+//                        leadingButton = {
+//                            SplitButtonDefaults.LeadingButton(
+//                                onClick = {
+//                                    com.ico.nekofeed.util.IntentUtils.openUrl(context, item.sourceUrl)
+//                                }
+//                            ) {
+//                                Icon(
+//                                    imageVector = Icons.Filled.ShoppingCart,
+//                                    contentDescription = null,
+//                                    modifier = Modifier.size(16.dp)
+//                                )
+//                                Spacer(modifier = Modifier.size(8.dp))
+//                                Text(
+//                                    text = item.ctaText,
+//                                    style = MaterialTheme.typography.labelLarge,
+//                                    fontWeight = FontWeight.SemiBold
+//                                )
+//                            }
+//                        },
+//                        trailingButton = {
+//                            SplitButtonDefaults.TrailingButton(
+//                                onClick = { menuExpanded = true }
+//                            ) {
+//                                Icon(
+//                                    imageVector = Icons.Default.KeyboardArrowDown,
+//                                    contentDescription = "更多选项"
+//                                )
+//                            }
+//                        }
+//                    )
+//
+//                    DropdownMenu(
+//                        expanded = menuExpanded,
+//                        onDismissRequest = { menuExpanded = false }
+//                    ) {
+//                        DropdownMenuItem(
+//                            text = { Text("加入购物车") },
+//                            onClick = { menuExpanded = false }
+//                        )
+//                        DropdownMenuItem(
+//                            text = { Text("联系商家") },
+//                            onClick = { menuExpanded = false }
+//                        )
+//                        DropdownMenuItem(
+//                            text = { Text("查看相似推荐") },
+//                            onClick = { menuExpanded = false }
+//                        )
+//                    }
+//                }
+//            }
         }
     }
 }

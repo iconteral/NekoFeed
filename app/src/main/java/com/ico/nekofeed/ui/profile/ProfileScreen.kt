@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.TipsAndUpdates
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -73,6 +74,7 @@ fun ProfileScreen(
     onNavigateToHistory: () -> Unit,
     onBack: () -> Unit,
     onNavigateToAiSettings: () -> Unit = {},
+    onNavigateToOnboarding: () -> Unit = {},
     loadStats: (suspend () -> UserStats?)? = null
 ) {
     val authState by authViewModel.uiState.collectAsState()
@@ -100,7 +102,8 @@ fun ProfileScreen(
         onNavigateToCollections = onNavigateToCollections,
         onNavigateToHistory = onNavigateToHistory,
         onBack = onBack,
-        onNavigateToAiSettings = onNavigateToAiSettings
+        onNavigateToAiSettings = onNavigateToAiSettings,
+        onNavigateToOnboarding = onNavigateToOnboarding
     )
 }
 
@@ -116,7 +119,8 @@ fun ProfileScreenContent(
     onNavigateToCollections: () -> Unit,
     onNavigateToHistory: () -> Unit,
     onBack: () -> Unit,
-    onNavigateToAiSettings: () -> Unit = {}
+    onNavigateToAiSettings: () -> Unit = {},
+    onNavigateToOnboarding: () -> Unit = {}
 ) {
     val isLoggedIn = authState.isLoggedIn
 
@@ -276,6 +280,11 @@ fun ProfileScreenContent(
                             title = "AI 设置",
                             onClick = onNavigateToAiSettings
                         )
+                        MenuItem(
+                            icon = Icons.Default.TipsAndUpdates,
+                            title = "新手引导",
+                            onClick = onNavigateToOnboarding
+                        )
                     }
                 }
             } else {
@@ -299,11 +308,18 @@ fun ProfileScreenContent(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
                     )
                 ) {
-                    MenuItem(
-                        icon = Icons.Default.Settings,
-                        title = "通用设置",
-                        onClick = onNavigateToAiSettings
-                    )
+                    Column {
+                        MenuItem(
+                            icon = Icons.Default.Settings,
+                            title = "通用设置",
+                            onClick = onNavigateToAiSettings
+                        )
+                        MenuItem(
+                            icon = Icons.Default.TipsAndUpdates,
+                            title = "新手引导",
+                            onClick = onNavigateToOnboarding
+                        )
+                    }
                 }
             }
 
@@ -398,7 +414,8 @@ fun ProfileScreenPreview() {
             onNavigateToLikes = {},
             onNavigateToCollections = {},
             onNavigateToHistory = {},
-            onBack = {}
+            onBack = {},
+            onNavigateToOnboarding = {}
         )
     }
 }
@@ -416,7 +433,8 @@ fun ProfileScreenGuestPreview() {
             onNavigateToLikes = {},
             onNavigateToCollections = {},
             onNavigateToHistory = {},
-            onBack = {}
+            onBack = {},
+            onNavigateToOnboarding = {}
         )
     }
 }
