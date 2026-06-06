@@ -15,19 +15,25 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
@@ -47,6 +53,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -72,8 +79,18 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import androidx.compose.ui.unit.sp
 private val NotoEmojiFont = FontFamily(Font(resId = R.font.noto_emoji_regular))
+private val NotoColorEmojiFont = FontFamily(Font(resId = R.font.noto_color_emoji_regular))
+private val FeedCategories = listOf(
+    FeedCategory.FEATURED,
+    FeedCategory.SHOPPING,
+    FeedCategory.LOCAL,
+    FeedCategory.VIDEO,
+    FeedCategory.TECH,
+    FeedCategory.AI
+)
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -121,6 +138,7 @@ fun FeedScreen(
         onCollectClick = handleCollectClick,
         onShareClick = viewModel::toggleShare,
         onTagClick = viewModel::filterByTag,
+        onClearTags = viewModel::clearTagFilters,
         onAiRequest = viewModel::requestAiAnalysis,
         onExposure = viewModel::recordExposure,
         onPlayingItemChange = viewModel::setPlayingItemId
@@ -144,12 +162,35 @@ fun FeedScreenContent(
     onCollectClick: (String) -> Unit,
     onShareClick: (String) -> Unit,
     onTagClick: (String) -> Unit,
+    onClearTags: () -> Unit,
     onAiRequest: (FeedItem) -> Unit,
     onExposure: (String) -> Unit = {},
     onPlayingItemChange: (String?) -> Unit
 ) {
-    val listState = rememberLazyListState()
-    val pullToRefreshState = rememberPullToRefreshState()
+    val coroutineScope = rememberCoroutineScope()
+    val selectedPage = FeedCategories.indexOf(uiState.selectedCategory).coerceAtLeast(0)
+    val pagerState = rememberPagerState(
+        initialPage = selectedPage,
+        pageCount = { FeedCategories.size }
+    )
+
+    LaunchedEffect(uiState.selectedCategory) {
+        if (pagerState.settledPage != selectedPage) {
+            pagerState.animateScrollToPage(selectedPage)
+        }
+    }
+
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.settledPage }
+            .distinctUntilChanged()
+            .collect { page ->
+                val category = FeedCategories[page]
+                if (category != uiState.selectedCategory) {
+                    onPlayingItemChange(null)
+                    onCategorySelected(category)
+                }
+            }
+    }
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier.fillMaxSize()
@@ -183,10 +224,7 @@ fun FeedScreenContent(
                         Text(
                             text = "\uD83D\uDC31",
                             fontSize = 25.sp,
-//                            fontFamily = NotoEmojiFont,
-//                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-//                            modifier = Modifier.
-//                            padding()
+                            fontFamily = NotoColorEmojiFont,
                         )
                     }
                     Spacer(modifier = Modifier.width(8.dp))
@@ -212,56 +250,78 @@ fun FeedScreenContent(
 
         // 2. Tab 频道栏
         FeedTabRow(
-            selectedCategory = uiState.selectedCategory,
-            onCategorySelected = onCategorySelected
+            selectedCategory = FeedCategories[pagerState.currentPage],
+            onCategorySelected = { category ->
+                coroutineScope.launch {
+                    pagerState.animateScrollToPage(FeedCategories.indexOf(category))
+                }
+            }
         )
 
         // 3. AI 搜索提示条
         AISearchBar(onClick = onSearchClick)
 
         // 4. 信息流列表
-        PullToRefreshBox(
-            isRefreshing = uiState.isRefreshing,
-            onRefresh = onRefresh,
-            state = pullToRefreshState,
-            indicator = {
-                PullToRefreshDefaults.LoadingIndicator(
-                    state = pullToRefreshState,
-                    isRefreshing = uiState.isRefreshing,
-                    modifier = Modifier.align(Alignment.TopCenter)
-                )
-            },
-            modifier = Modifier.weight(1f).fillMaxWidth()
-        ) {
-            when {
-                uiState.isLoading -> {
-                    FeedLoadingContent()
-                }
-                uiState.errorMessage != null && uiState.items.isEmpty() -> {
-                    ErrorContent(
-                        message = uiState.errorMessage,
-                        onRetry = onRetry
+        FeedTagFilter(
+            availableTags = uiState.availableTags,
+            selectedTags = uiState.selectedTags,
+            onTagClick = onTagClick,
+            onClearTags = onClearTags
+        )
+
+        HorizontalPager(
+            state = pagerState,
+            beyondViewportPageCount = 1,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+        ) { page ->
+            val pageCategory = FeedCategories[page]
+            val listState = rememberLazyListState()
+            val pullToRefreshState = rememberPullToRefreshState()
+            PullToRefreshBox(
+                isRefreshing = uiState.isRefreshing && pageCategory == uiState.selectedCategory,
+                onRefresh = onRefresh,
+                state = pullToRefreshState,
+                indicator = {
+                    PullToRefreshDefaults.LoadingIndicator(
+                        state = pullToRefreshState,
+                        isRefreshing = uiState.isRefreshing,
+                        modifier = Modifier.align(Alignment.TopCenter)
                     )
-                }
-                else -> {
-                    FeedContent(
-                        items = uiState.items,
-                        usingFallback = uiState.usingFallback,
-                        isLoadingMore = uiState.isLoadingMore,
-                        hasMore = uiState.hasMore,
-                        listState = listState,
-                        isAiEnabled = uiState.isAiEnabled,
-                        playingItemId = playingItemId,
-                        onItemClick = onItemClick,
-                        onLoadMore = onLoadMore,
-                        onLikeClick = onLikeClick,
-                        onCollectClick = onCollectClick,
-                        onShareClick = onShareClick,
-                        onTagClick = onTagClick,
-                        onAiRequest = onAiRequest,
-                        onExposure = onExposure,
-                        onPlayingItemChange = onPlayingItemChange
-                    )
+                },
+                modifier = Modifier.fillMaxSize()
+            ) {
+                when {
+                    pageCategory != uiState.selectedCategory || uiState.isLoading -> {
+                        FeedLoadingContent()
+                    }
+                    uiState.errorMessage != null && uiState.items.isEmpty() -> {
+                        ErrorContent(
+                            message = uiState.errorMessage,
+                            onRetry = onRetry
+                        )
+                    }
+                    else -> {
+                        FeedContent(
+                            items = uiState.items,
+                            usingFallback = uiState.usingFallback,
+                            isLoadingMore = uiState.isLoadingMore,
+                            hasMore = uiState.hasMore,
+                            listState = listState,
+                            isAiEnabled = uiState.isAiEnabled,
+                            playingItemId = playingItemId,
+                            onItemClick = onItemClick,
+                            onLoadMore = onLoadMore,
+                            onLikeClick = onLikeClick,
+                            onCollectClick = onCollectClick,
+                            onShareClick = onShareClick,
+                            onTagClick = onTagClick,
+                            onAiRequest = onAiRequest,
+                            onExposure = onExposure,
+                            onPlayingItemChange = onPlayingItemChange
+                        )
+                    }
                 }
             }
         }
@@ -289,27 +349,82 @@ fun FeedScreenContent(
 }
 
 @Composable
+private fun FeedTagFilter(
+    availableTags: List<String>,
+    selectedTags: List<String>,
+    onTagClick: (String) -> Unit,
+    onClearTags: () -> Unit
+) {
+    if (availableTags.isEmpty()) return
+
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp)
+    ) {
+        item(key = "filter-label") {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.FilterList,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
+                )
+                Text(
+                    text = "筛选",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        items(availableTags, key = { "tag-$it" }) { tag ->
+            FilterChip(
+                selected = tag in selectedTags,
+                onClick = { onTagClick(tag) },
+                label = { Text(tag) }
+            )
+        }
+
+        if (selectedTags.isNotEmpty()) {
+            item(key = "clear-tags") {
+                FilterChip(
+                    selected = false,
+                    onClick = onClearTags,
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    },
+                    label = { Text("清除") }
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun FeedTabRow(
     selectedCategory: FeedCategory,
     onCategorySelected: (FeedCategory) -> Unit
 ) {
-    val categories = listOf(
-        FeedCategory.FEATURED,
-        FeedCategory.SHOPPING,
-        FeedCategory.LOCAL,
-        FeedCategory.VIDEO,
-        FeedCategory.TECH,
-        FeedCategory.AI
-    )
-
     PrimaryScrollableTabRow(
-        selectedTabIndex = categories.indexOf(selectedCategory),
+        selectedTabIndex = FeedCategories.indexOf(selectedCategory),
         containerColor = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.primary,
         edgePadding = 16.dp,
         divider = {}
     ) {
-        categories.forEach { category ->
+        FeedCategories.forEach { category ->
             Tab(
                 selected = selectedCategory == category,
                 onClick = { onCategorySelected(category) },
@@ -647,6 +762,7 @@ fun FeedScreenPreview() {
             onCollectClick = {},
             onShareClick = {},
             onTagClick = {},
+            onClearTags = {},
             onAiRequest = {},
             onExposure = {},
             onPlayingItemChange = {}
