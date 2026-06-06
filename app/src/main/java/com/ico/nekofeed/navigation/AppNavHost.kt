@@ -174,6 +174,11 @@ private fun MainScreen(
     val navigateToLogin: () -> Unit = {
         navController.navigate("login")
     }
+    val openDetail: (String) -> Unit = { itemId ->
+        feedViewModel.recordClick(itemId)
+        val encodedId = Uri.encode(itemId)
+        nestedNavController.navigate("detail/$encodedId")
+    }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -202,10 +207,7 @@ private fun MainScreen(
             composable("feed") {
                 FeedScreen(
                     viewModel = feedViewModel,
-                    onItemClick = { itemId ->
-                        val encodedId = Uri.encode(itemId)
-                        nestedNavController.navigate("detail/$encodedId")
-                    },
+                    onItemClick = openDetail,
                     onSearchClick = {
                         nestedNavController.navigate("search")
                     },
@@ -229,27 +231,11 @@ private fun MainScreen(
                 val uiState by feedViewModel.uiState.collectAsState()
                 val item = remember(decodedId, uiState.items) { feedViewModel.getItemById(decodedId) }
 
-                LaunchedEffect(decodedId) {
-                    feedViewModel.recordClick(decodedId)
-                }
-
                 FeedDetailScreen(
                     item = item,
                     onBack = { nestedNavController.popBackStack() },
-                    onLikeClick = { id ->
-                        if (authState.isLoggedIn) {
-                            feedViewModel.toggleLike(id)
-                        } else {
-                            navigateToLogin()
-                        }
-                    },
-                    onCollectClick = { id ->
-                        if (authState.isLoggedIn) {
-                            feedViewModel.toggleCollect(id)
-                        } else {
-                            navigateToLogin()
-                        }
-                    },
+                    onLikeClick = feedViewModel::toggleLike,
+                    onCollectClick = feedViewModel::toggleCollect,
                     onShareClick = { id -> feedViewModel.toggleShare(id) },
                     isAiEnabled = uiState.isAiEnabled,
                     onAiRequest = { feedViewModel.requestAiAnalysis(it) }
@@ -260,10 +246,7 @@ private fun MainScreen(
                 val searchViewModel: SearchViewModel = viewModel()
                 SearchScreen(
                     onBack = { nestedNavController.popBackStack() },
-                    onItemClick = { itemId ->
-                        val encodedId = Uri.encode(itemId)
-                        nestedNavController.navigate("detail/$encodedId")
-                    },
+                    onItemClick = openDetail,
                     searchViewModel = searchViewModel,
                     allItems = feedViewModel.getAllItems()
                 )
@@ -274,24 +257,9 @@ private fun MainScreen(
                 ChatScreen(
                     chatViewModel = chatViewModel,
                     allItems = feedViewModel.getAllItems(),
-                    onItemClick = { itemId ->
-                        val encodedId = Uri.encode(itemId)
-                        nestedNavController.navigate("detail/$encodedId")
-                    },
-                    onLikeClick = { itemId ->
-                        if (authState.isLoggedIn) {
-                            feedViewModel.toggleLike(itemId)
-                        } else {
-                            navigateToLogin()
-                        }
-                    },
-                    onCollectClick = { itemId ->
-                        if (authState.isLoggedIn) {
-                            feedViewModel.toggleCollect(itemId)
-                        } else {
-                            navigateToLogin()
-                        }
-                    },
+                    onItemClick = openDetail,
+                    onLikeClick = feedViewModel::toggleLike,
+                    onCollectClick = feedViewModel::toggleCollect,
                     onShareClick = { itemId ->
                         feedViewModel.toggleShare(itemId)
                     }
@@ -301,11 +269,8 @@ private fun MainScreen(
             composable("stats") {
                 StatsScreen(
                     onBack = { nestedNavController.popBackStack() },
-                    getStats = { feedViewModel.getStats() },
-                    onItemClick = { itemId ->
-                        val encodedId = Uri.encode(itemId)
-                        nestedNavController.navigate("detail/$encodedId")
-                    }
+                    stats = feedViewModel.getStats(),
+                    onItemClick = openDetail
                 )
             }
 
@@ -332,10 +297,7 @@ private fun MainScreen(
                 UserInteractionScreen(
                     type = InteractionType.LIKES,
                     onBack = { nestedNavController.popBackStack() },
-                    onItemClick = { itemId ->
-                        val encodedId = Uri.encode(itemId)
-                        nestedNavController.navigate("detail/$encodedId")
-                    }
+                    onItemClick = openDetail
                 )
             }
 
@@ -343,10 +305,7 @@ private fun MainScreen(
                 UserInteractionScreen(
                     type = InteractionType.COLLECTIONS,
                     onBack = { nestedNavController.popBackStack() },
-                    onItemClick = { itemId ->
-                        val encodedId = Uri.encode(itemId)
-                        nestedNavController.navigate("detail/$encodedId")
-                    }
+                    onItemClick = openDetail
                 )
             }
 
@@ -354,10 +313,7 @@ private fun MainScreen(
                 UserInteractionScreen(
                     type = InteractionType.HISTORY,
                     onBack = { nestedNavController.popBackStack() },
-                    onItemClick = { itemId ->
-                        val encodedId = Uri.encode(itemId)
-                        nestedNavController.navigate("detail/$encodedId")
-                    }
+                    onItemClick = openDetail
                 )
             }
 

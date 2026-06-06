@@ -28,11 +28,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -69,22 +71,21 @@ fun VideoFeedCard(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    var playerManager by remember { mutableStateOf<PlayerManager?>(null) }
+    val playerManager = remember(context) { PlayerManager.getInstance(context) }
+    val playbackError by playerManager.playbackError.collectAsState()
     var isMuted by remember { mutableStateOf(true) }
 
     LaunchedEffect(isPlaying, item.mediaUrl) {
         if (isPlaying) {
-            val manager = PlayerManager.getInstance(context)
-            playerManager = manager
-            manager.play(item.mediaUrl)
-            isMuted = manager.isMuted
+            playerManager.play(item.mediaUrl, ownerId = item.id)
+            isMuted = playerManager.isMuted
         }
     }
 
-    DisposableEffect(isPlaying, playerManager) {
+    DisposableEffect(isPlaying, item.id, playerManager) {
         onDispose {
-            if (isPlaying) {
-                playerManager?.pause()
+            if (isPlaying && playbackError == null) {
+                playerManager.pause(ownerId = item.id)
             }
         }
     }
@@ -97,20 +98,20 @@ fun VideoFeedCard(
                 .height(260.dp)
                 .background(Color.Black)
         ) {
-            val activePlayerManager = playerManager
-            if (isPlaying && activePlayerManager != null) {
+            if (isPlaying) {
                 AndroidView(
                     factory = { ctx ->
                         androidx.media3.ui.PlayerView(ctx).apply {
                             useController = false
-                            player = activePlayerManager.exoPlayer
+                            player = playerManager.exoPlayer
                             resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
                         }
                     },
                     update = { view ->
-                        if (view.player != activePlayerManager.exoPlayer) {
-                            view.player = activePlayerManager.exoPlayer
+                        if (view.player != playerManager.exoPlayer) {
+                            view.player = playerManager.exoPlayer
                         }
+                        playerManager.exoPlayer.playWhenReady = true
                     },
                     modifier = Modifier.fillMaxWidth().height(260.dp)
                 )
@@ -124,8 +125,8 @@ fun VideoFeedCard(
                 ) {
                     IconButton(
                         onClick = {
-                            activePlayerManager.toggleMute()
-                            isMuted = activePlayerManager.isMuted
+                            playerManager.toggleMute()
+                            isMuted = playerManager.isMuted
                             onMuteToggle()
                         },
                         modifier = Modifier.size(32.dp)
@@ -160,6 +161,19 @@ fun VideoFeedCard(
                             )
                         )
                 )
+                if (isPlaying && playbackError != null) {
+                    TextButton(
+                        onClick = {
+                            playerManager.play(item.mediaUrl, ownerId = item.id)
+                        },
+                        modifier = Modifier.align(Alignment.Center)
+                    ) {
+                        Text(
+                            text = "视频加载失败，点击重试",
+                            color = Color.White
+                        )
+                    }
+                }
             } else {
                 Box(
                     modifier = Modifier

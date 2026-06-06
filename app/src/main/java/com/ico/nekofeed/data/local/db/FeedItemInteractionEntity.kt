@@ -10,5 +10,6 @@ data class FeedItemInteractionEntity(
     val isCollected: Boolean = false,
     val likeCount: Int = 0,
     val collectCount: Int = 0,
+    val lastViewedAt: Long? = null,
     val updatedAt: Long = System.currentTimeMillis()
 )

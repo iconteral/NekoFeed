@@ -50,6 +50,8 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -200,12 +202,22 @@ private fun HeroMediaSection(
 ) {
     val context = LocalContext.current
     val playerManager = remember { PlayerManager.getInstance(context) }
+    val playbackError by playerManager.playbackError.collectAsState()
 
     // 当进入详情页且是视频时，自动播放并解除静音
     LaunchedEffect(item.id) {
         if (item.isVideo) {
-            playerManager.play(item.mediaUrl)
+            playerManager.play(item.mediaUrl, ownerId = item.id)
             playerManager.setMute(false)
+        }
+    }
+
+    DisposableEffect(item.id) {
+        onDispose {
+            if (item.isVideo) {
+                playerManager.pause(ownerId = item.id)
+                playerManager.setMute(true)
+            }
         }
     }
 
@@ -216,7 +228,7 @@ private fun HeroMediaSection(
             .background(Color.Black),
         contentAlignment = Alignment.Center
     ) {
-        if (item.isVideo) {
+        if (item.isVideo && playbackError == null) {
             AndroidView(
                 factory = { ctx ->
                     androidx.media3.ui.PlayerView(ctx).apply {
@@ -257,6 +269,15 @@ private fun HeroMediaSection(
                         )
                     )
             )
+            if (item.isVideo && playbackError != null) {
+                Button(
+                    onClick = {
+                        playerManager.play(item.mediaUrl, ownerId = item.id)
+                    }
+                ) {
+                    Text("视频加载失败，点击重试")
+                }
+            }
         } else {
             Text(
                 text = "📷",
@@ -484,7 +505,12 @@ private fun ContentSection(item: FeedItem, isAiEnabled: Boolean) {
         // 产品介绍
         if (item.content != null || item.summary != null) {
             Text(
-                text = "产品介绍",
+                text = when {
+                    item.itemType == "product" -> "产品介绍"
+                    item.isVideo -> "视频介绍"
+                    item.isAd -> "广告详情"
+                    else -> "正文"
+                },
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(bottom = 12.dp)

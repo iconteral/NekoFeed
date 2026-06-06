@@ -3,6 +3,7 @@ package com.ico.nekofeed.player
 import android.content.Context
 import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.database.StandaloneDatabaseProvider
@@ -13,6 +14,9 @@ import androidx.media3.datasource.cache.SimpleCache
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import java.io.File
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 @OptIn(UnstableApi::class)
 class PlayerManager private constructor(context: Context) {
@@ -31,6 +35,9 @@ class PlayerManager private constructor(context: Context) {
     private var simpleCache: SimpleCache? = null
     val exoPlayer: ExoPlayer
     private var currentMediaUrl: String? = null
+    private var playbackOwnerId: String? = null
+    private val _playbackError = MutableStateFlow<String?>(null)
+    val playbackError: StateFlow<String?> = _playbackError.asStateFlow()
     var isMuted: Boolean = true
         private set
 
@@ -54,22 +61,34 @@ class PlayerManager private constructor(context: Context) {
         
         exoPlayer.repeatMode = Player.REPEAT_MODE_ONE
         exoPlayer.volume = 0f // 默认静音
+        exoPlayer.addListener(
+            object : Player.Listener {
+                override fun onPlayerError(error: PlaybackException) {
+                    _playbackError.value = error.message ?: "视频加载失败"
+                }
+            }
+        )
     }
 
-    fun play(mediaUrl: String?) {
+    fun play(mediaUrl: String?, ownerId: String? = null) {
         if (mediaUrl.isNullOrBlank()) return
 
+        _playbackError.value = null
+        playbackOwnerId = ownerId
         if (currentMediaUrl != mediaUrl) {
             currentMediaUrl = mediaUrl
             val mediaItem = MediaItem.fromUri(mediaUrl)
             exoPlayer.setMediaItem(mediaItem)
             exoPlayer.prepare()
         }
-        exoPlayer.play()
+        exoPlayer.playWhenReady = true
     }
 
-    fun pause() {
+    fun pause(ownerId: String? = null) {
+        if (ownerId != null && playbackOwnerId != ownerId) return
+
         exoPlayer.pause()
+        playbackOwnerId = null
     }
 
     fun setMute(muted: Boolean) {
@@ -86,6 +105,8 @@ class PlayerManager private constructor(context: Context) {
         simpleCache?.release()
         simpleCache = null
         currentMediaUrl = null
+        playbackOwnerId = null
+        _playbackError.value = null
         instance = null
     }
 }

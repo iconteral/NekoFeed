@@ -18,4 +18,7 @@ interface FeedItemInteractionDao {
 
     @Query("DELETE FROM feed_item_interaction")
     suspend fun clearAll()
+
+    @Query("UPDATE feed_item_interaction SET lastViewedAt = NULL")
+    suspend fun clearHistory()
 }

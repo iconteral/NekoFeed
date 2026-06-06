@@ -10,9 +10,14 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
 class FeedRepository(
-    private val feedApi: FeedApi,
+    private val feedApiProvider: () -> FeedApi,
     private val tokenManager: TokenManager? = null
 ) {
+    constructor(
+        feedApi: FeedApi,
+        tokenManager: TokenManager? = null
+    ) : this({ feedApi }, tokenManager)
+
     private val cachedItems = mutableListOf<FeedItem>()
 
     suspend fun loadFeed(
@@ -34,7 +39,7 @@ class FeedRepository(
             }
 
             try {
-                val response = feedApi.getFeed(
+                val response = feedApiProvider().getFeed(
                     category = category,
                     itemType = itemType,
                     limit = limit,
@@ -44,11 +49,23 @@ class FeedRepository(
                 val items = response.items
                 if (offset == 0) {
                     cachedItems.clear()
+                    tokenManager?.saveCachedFeed(category, items)
                 }
                 cachedItems.addAll(items)
                 Result.success(items)
             } catch (e: Exception) {
-                Result.failure(e)
+                val cachedFeed = if (offset == 0) {
+                    tokenManager?.getCachedFeed(category).orEmpty()
+                } else {
+                    emptyList()
+                }
+                if (cachedFeed.isNotEmpty()) {
+                    cachedItems.clear()
+                    cachedItems.addAll(cachedFeed)
+                    Result.success(cachedFeed)
+                } else {
+                    Result.failure(e)
+                }
             }
         }
     }

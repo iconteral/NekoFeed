@@ -50,6 +50,7 @@ fun FeedItemCard(
                 item = item,
                 onLikeClick = onLikeClick,
                 onCollectClick = onCollectClick,
+                onShareClick = onShareClick,
                 onTagClick = onTagClick,
                 isAiEnabled = isAiEnabled
             )
@@ -75,6 +76,7 @@ fun FeedItemCard(
                 item = item,
                 onLikeClick = onLikeClick,
                 onCollectClick = onCollectClick,
+                onShareClick = onShareClick,
                 onTagClick = onTagClick,
                 isAiEnabled = isAiEnabled
             )

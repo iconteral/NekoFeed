@@ -781,9 +781,7 @@ internal fun LoginPage(
             modifier = Modifier
                 .size(80.dp)
                 .background(
-                    Brush.linearGradient(
-                        colors = listOf(Primary, AccentBlue)
-                    ),
+                    MaterialTheme.colorScheme.primaryContainer,
                     RoundedCornerShape(20.dp)
                 ),
             contentAlignment = Alignment.Center
@@ -792,7 +790,7 @@ internal fun LoginPage(
                 imageVector = Icons.Default.Person,
                 contentDescription = null,
                 modifier = Modifier.size(40.dp),
-                tint = Color.White
+                tint = MaterialTheme.colorScheme.onPrimaryContainer
             )
         }
 
@@ -824,7 +822,7 @@ internal fun LoginPage(
             ) {
                 Surface(
                     shape = RoundedCornerShape(16.dp),
-                    color = AccentGreen.copy(alpha = 0.1f)
+                    color = MaterialTheme.colorScheme.tertiaryContainer
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
@@ -833,14 +831,14 @@ internal fun LoginPage(
                         Icon(
                             imageVector = Icons.Default.Check,
                             contentDescription = null,
-                            tint = AccentGreen,
+                            tint = MaterialTheme.colorScheme.tertiary,
                             modifier = Modifier.size(24.dp)
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
                             text = "登录成功！",
                             style = MaterialTheme.typography.titleMedium,
-                            color = AccentGreen,
+                            color = MaterialTheme.colorScheme.tertiary,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -851,7 +849,7 @@ internal fun LoginPage(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    containerColor = MaterialTheme.colorScheme.surface
                 )
             ) {
                 Column(
@@ -869,7 +867,7 @@ internal fun LoginPage(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Primary,
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
                             unfocusedBorderColor = MaterialTheme.colorScheme.outline
                         )
                     )
@@ -887,7 +885,7 @@ internal fun LoginPage(
                         visualTransformation = PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Primary,
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
                             unfocusedBorderColor = MaterialTheme.colorScheme.outline
                         )
                     )
@@ -905,12 +903,14 @@ internal fun LoginPage(
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !isLoggingIn,
                         shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Primary)
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        )
                     ) {
                         if (isLoggingIn) {
                             LoadingIndicator(
                                 modifier = Modifier.size(24.dp),
-                                color = Color.White
+                                color = MaterialTheme.colorScheme.onPrimary
                             )
                         } else {
                             Text("登录")

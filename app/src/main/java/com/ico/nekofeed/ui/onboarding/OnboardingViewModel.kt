@@ -32,7 +32,10 @@ data class OnboardingUiState(
 
 class OnboardingViewModel(application: Application) : AndroidViewModel(application) {
     private val tokenManager = TokenManager(application)
-    private val authRepository = AuthRepository(RetrofitClient.feedApi, tokenManager)
+    private val authRepository = AuthRepository(
+        feedApiProvider = { RetrofitClient.feedApi },
+        tokenManager = tokenManager
+    )
 
     private val _uiState = MutableStateFlow(OnboardingUiState())
     val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()

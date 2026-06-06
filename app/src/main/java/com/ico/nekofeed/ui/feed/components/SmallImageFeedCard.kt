@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.Bookmark
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -47,6 +48,7 @@ fun SmallImageFeedCard(
     item: FeedItem,
     onLikeClick: ((String) -> Unit)? = null,
     onCollectClick: ((String) -> Unit)? = null,
+    onShareClick: ((String) -> Unit)? = null,
     onTagClick: ((String) -> Unit)? = null,
     isAiEnabled: Boolean = true,
     modifier: Modifier = Modifier
@@ -219,6 +221,18 @@ fun SmallImageFeedCard(
                         text = formatCount(item.collectCount),
                         style = MaterialTheme.typography.labelSmall,
                         color = if (item.isCollected) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                IconButton(
+                    onClick = { onShareClick?.invoke(item.id) },
+                    modifier = Modifier.size(14.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Share,
+                        contentDescription = "分享",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(14.dp)
                     )
                 }
             }
