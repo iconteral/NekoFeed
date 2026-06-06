@@ -39,10 +39,12 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -64,7 +66,8 @@ import com.ico.nekofeed.ui.feed.components.FeedItemCard
 import com.ico.nekofeed.util.FeedUiState
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.ui.unit.sp
 private val NotoEmojiFont = FontFamily(Font(resId = R.font.noto_emoji_regular))
 
@@ -80,13 +83,40 @@ fun FeedScreen(
     viewModel: FeedViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val playingItemId by viewModel.playingItemId.collectAsState()
+
+    // 使用 remember 缓存 lambda，避免每次重组创建新实例
+    val handleItemClick = remember<(String) -> Unit> {
+        { itemId ->
+            viewModel.recordClick(itemId)
+            onItemClick(itemId)
+        }
+    }
+
+    val handleLikeClick = remember<(String) -> Unit> {
+        { itemId ->
+            if (isLoggedIn) {
+                viewModel.toggleLike(itemId)
+            } else {
+                onLogin()
+            }
+        }
+    }
+
+    val handleCollectClick = remember<(String) -> Unit> {
+        { itemId ->
+            if (isLoggedIn) {
+                viewModel.toggleCollect(itemId)
+            } else {
+                onLogin()
+            }
+        }
+    }
 
     FeedScreenContent(
         uiState = uiState,
-        onItemClick = { itemId ->
-            viewModel.recordClick(itemId)
-            onItemClick(itemId)
-        },
+        playingItemId = playingItemId,
+        onItemClick = handleItemClick,
         onSearchClick = onSearchClick,
         onStatsClick = onStatsClick,
         onAiSettingsClick = onAiSettingsClick,
@@ -94,20 +124,8 @@ fun FeedScreen(
         onRefresh = viewModel::refresh,
         onRetry = viewModel::retry,
         onLoadMore = viewModel::loadMore,
-        onLikeClick = { itemId ->
-            if (isLoggedIn) {
-                viewModel.toggleLike(itemId)
-            } else {
-                onLogin()
-            }
-        },
-        onCollectClick = { itemId ->
-            if (isLoggedIn) {
-                viewModel.toggleCollect(itemId)
-            } else {
-                onLogin()
-            }
-        },
+        onLikeClick = handleLikeClick,
+        onCollectClick = handleCollectClick,
         onShareClick = viewModel::toggleShare,
         onTagClick = viewModel::filterByTag,
         onAiRequest = viewModel::requestAiAnalysis,
@@ -120,6 +138,7 @@ fun FeedScreen(
 @Composable
 fun FeedScreenContent(
     uiState: FeedUiState,
+    playingItemId: String? = null,
     onItemClick: (String) -> Unit,
     onSearchClick: () -> Unit,
     onStatsClick: () -> Unit,
@@ -230,6 +249,7 @@ fun FeedScreenContent(
                         hasMore = uiState.hasMore,
                         listState = listState,
                         isAiEnabled = uiState.isAiEnabled,
+                        playingItemId = playingItemId,
                         onItemClick = onItemClick,
                         onLoadMore = onLoadMore,
                         onLikeClick = onLikeClick,
@@ -238,8 +258,7 @@ fun FeedScreenContent(
                         onTagClick = onTagClick,
                         onAiRequest = onAiRequest,
                         onExposure = onExposure,
-                        onPlayingItemChange = onPlayingItemChange,
-                        playingItemId = uiState.playingItemId
+                        onPlayingItemChange = onPlayingItemChange
                     )
                 }
             }
@@ -378,91 +397,57 @@ private fun FeedContent(
             }
     }
 
-    // Auto-play detection: find the item closest to center, with debounce
-    @OptIn(kotlinx.coroutines.FlowPreview::class)
-    LaunchedEffect(listState) {
-        snapshotFlow {
-            val layoutInfo = listState.layoutInfo
-            val center = (layoutInfo.viewportEndOffset + layoutInfo.viewportStartOffset) / 2
-            
-            var closestItem: androidx.compose.foundation.lazy.LazyListItemInfo? = null
-            var minDistance = Int.MAX_VALUE
-            
-            for (itemInfo in layoutInfo.visibleItemsInfo) {
-                val itemCenter = itemInfo.offset + itemInfo.size / 2
-                val distance = kotlin.math.abs(itemCenter - center)
-                if (distance < minDistance) {
-                    minDistance = distance
-                    closestItem = itemInfo
-                }
-            }
-            closestItem?.key as? String
-        }
-        .distinctUntilChanged()
-        .debounce(500L)
-        .collect { itemId ->
-            onPlayingItemChange(itemId)
-        }
-    }
-
     // Lifecycle observer to pause video when app goes to background
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-    LaunchedEffect(lifecycleOwner) {
+    val currentOnPlayingItemChange by rememberUpdatedState(onPlayingItemChange)
+    DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             if (event == androidx.lifecycle.Lifecycle.Event.ON_PAUSE) {
-                onPlayingItemChange(null)
+                currentOnPlayingItemChange(null)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        kotlinx.coroutines.suspendCancellableCoroutine<Unit> { continuation ->
-            continuation.invokeOnCancellation {
-                lifecycleOwner.lifecycle.removeObserver(observer)
-            }
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 
-    // Exposure tracking: detect visible items for exposure count
-    @OptIn(kotlinx.coroutines.FlowPreview::class)
-    LaunchedEffect(listState) {
-        snapshotFlow {
-            listState.layoutInfo.visibleItemsInfo.mapNotNull { it.key as? String }
-        }
-            .distinctUntilChanged()
-            .debounce(300L)
-            .collect { visibleIds ->
-                visibleIds.forEach { id ->
-                    onExposure(id)
-                }
-            }
-    }
-
-    // AI request: only for the focused item (closest to center), with debounce
     val itemMap = remember(items) { items.associateBy { it.id } }
-    @OptIn(kotlinx.coroutines.FlowPreview::class)
+    val currentItemMap by rememberUpdatedState(itemMap)
+    val currentOnExposure by rememberUpdatedState(onExposure)
+    val currentOnAiRequest by rememberUpdatedState(onAiRequest)
+
+    // Expensive viewport work runs only after scrolling has fully stopped. This
+    // avoids creating PlayerView, starting playback, and scheduling AI work while
+    // LazyColumn is trying to meet frame deadlines.
     LaunchedEffect(listState, isAiEnabled) {
-        if (!isAiEnabled) return@LaunchedEffect
-        snapshotFlow {
-            val layoutInfo = listState.layoutInfo
-            val center = (layoutInfo.viewportEndOffset + layoutInfo.viewportStartOffset) / 2
-            var closestItem: androidx.compose.foundation.lazy.LazyListItemInfo? = null
-            var minDistance = Int.MAX_VALUE
-            for (itemInfo in layoutInfo.visibleItemsInfo) {
-                val itemCenter = itemInfo.offset + itemInfo.size / 2
-                val distance = kotlin.math.abs(itemCenter - center)
-                if (distance < minDistance) {
-                    minDistance = distance
-                    closestItem = itemInfo
-                }
-            }
-            closestItem?.key as? String
-        }
+        snapshotFlow { listState.isScrollInProgress }
             .distinctUntilChanged()
-            .debounce(800L)
-            .collect { focusedId ->
-                focusedId?.let { id ->
-                    itemMap[id]?.let { item ->
-                        onAiRequest(item)
+            .collectLatest { isScrolling ->
+                if (isScrolling) {
+                    currentOnPlayingItemChange(null)
+                    return@collectLatest
+                }
+
+                delay(350L)
+
+                val layoutInfo = listState.layoutInfo
+                val visibleItems = layoutInfo.visibleItemsInfo
+                visibleItems
+                    .mapNotNull { it.key as? String }
+                    .forEach(currentOnExposure)
+
+                val viewportCenter =
+                    (layoutInfo.viewportEndOffset + layoutInfo.viewportStartOffset) / 2
+                val focusedId = visibleItems
+                    .minByOrNull { itemInfo ->
+                        kotlin.math.abs(itemInfo.offset + itemInfo.size / 2 - viewportCenter)
                     }
+                    ?.key as? String
+
+                currentOnPlayingItemChange(focusedId)
+                if (isAiEnabled && focusedId != null) {
+                    currentItemMap[focusedId]?.let(currentOnAiRequest)
                 }
             }
     }
@@ -620,6 +605,7 @@ fun FeedScreenPreview() {
                 items = FallbackFeedData.items,
                 isLoading = false
             ),
+            playingItemId = null,
             onItemClick = {},
             onSearchClick = {},
             onStatsClick = {},

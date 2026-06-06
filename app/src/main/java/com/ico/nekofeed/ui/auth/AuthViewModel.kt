@@ -38,6 +38,10 @@ class AuthViewModel(private val authRepository: AuthRepository) : ViewModel() {
         }
     }
 
+    fun refreshLoginStatus() {
+        checkLoginStatus()
+    }
+
     fun register(username: String, password: String) {
         if (username.isBlank() || password.isBlank()) {
             _uiState.value = _uiState.value.copy(error = "Username and password cannot be empty")

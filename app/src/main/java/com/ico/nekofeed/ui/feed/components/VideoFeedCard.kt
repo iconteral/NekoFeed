@@ -33,6 +33,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -68,14 +69,23 @@ fun VideoFeedCard(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val playerManager = remember { PlayerManager.getInstance(context) }
-    var isMuted by remember { mutableStateOf(playerManager.isMuted) }
+    var playerManager by remember { mutableStateOf<PlayerManager?>(null) }
+    var isMuted by remember { mutableStateOf(true) }
 
-    LaunchedEffect(isPlaying) {
+    LaunchedEffect(isPlaying, item.mediaUrl) {
         if (isPlaying) {
-            playerManager.play(item.mediaUrl)
-            // Update mute state to match manager
-            isMuted = playerManager.isMuted
+            val manager = PlayerManager.getInstance(context)
+            playerManager = manager
+            manager.play(item.mediaUrl)
+            isMuted = manager.isMuted
+        }
+    }
+
+    DisposableEffect(isPlaying, playerManager) {
+        onDispose {
+            if (isPlaying) {
+                playerManager?.pause()
+            }
         }
     }
 
@@ -87,18 +97,19 @@ fun VideoFeedCard(
                 .height(260.dp)
                 .background(Color.Black)
         ) {
-            if (isPlaying) {
+            val activePlayerManager = playerManager
+            if (isPlaying && activePlayerManager != null) {
                 AndroidView(
                     factory = { ctx ->
                         androidx.media3.ui.PlayerView(ctx).apply {
                             useController = false
-                            player = playerManager.exoPlayer
+                            player = activePlayerManager.exoPlayer
                             resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
                         }
                     },
                     update = { view ->
-                        if (view.player != playerManager.exoPlayer) {
-                            view.player = playerManager.exoPlayer
+                        if (view.player != activePlayerManager.exoPlayer) {
+                            view.player = activePlayerManager.exoPlayer
                         }
                     },
                     modifier = Modifier.fillMaxWidth().height(260.dp)
@@ -113,8 +124,8 @@ fun VideoFeedCard(
                 ) {
                     IconButton(
                         onClick = {
-                            playerManager.toggleMute()
-                            isMuted = playerManager.isMuted
+                            activePlayerManager.toggleMute()
+                            isMuted = activePlayerManager.isMuted
                             onMuteToggle()
                         },
                         modifier = Modifier.size(32.dp)
@@ -128,13 +139,11 @@ fun VideoFeedCard(
                     }
                 }
             } else if (item.imageUrl != null) {
-                AsyncImage(
-                    model = item.imageUrl,
+                SkeletonImage(
+                    imageUrl = item.imageUrl,
                     contentDescription = item.title,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(260.dp),
-                    contentScale = ContentScale.Crop
+                    modifier = Modifier.fillMaxWidth(),
+                    height = 260.dp
                 )
                 // 渐变遮罩
                 Box(

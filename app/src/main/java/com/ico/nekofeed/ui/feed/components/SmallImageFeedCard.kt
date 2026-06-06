@@ -224,34 +224,12 @@ fun SmallImageFeedCard(
             }
         }
 
-        // 右侧缩略图
-        Box(
-            modifier = Modifier
-                .size(91.dp)
-                .clip(RoundedCornerShape(10.dp))
-        ) {
-            if (item.imageUrl != null) {
-                AsyncImage(
-                    model = item.imageUrl,
-                    contentDescription = item.title,
-                    modifier = Modifier
-                        .size(92.dp),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .size(92.dp)
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "📷",
-                        style = MaterialTheme.typography.titleLarge
-                    )
-                }
-            }
-        }
+        // 右侧缩略图 - 使用骨架屏
+        SmallSkeletonImage(
+            imageUrl = item.imageUrl,
+            contentDescription = item.title,
+            modifier = Modifier.size(91.dp)
+        )
     }
 }
 

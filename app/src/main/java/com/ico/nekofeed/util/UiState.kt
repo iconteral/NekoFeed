@@ -1,8 +1,10 @@
 package com.ico.nekofeed.util
 
+import androidx.compose.runtime.Immutable
 import com.ico.nekofeed.data.model.FeedCategory
 import com.ico.nekofeed.data.model.FeedItem
 
+@Immutable
 data class FeedUiState(
     val isLoading: Boolean = false,
     val isRefreshing: Boolean = false,
@@ -11,7 +13,6 @@ data class FeedUiState(
     val items: List<FeedItem> = emptyList(),
     val selectedCategory: FeedCategory = FeedCategory.FEATURED,
     val selectedTags: List<String> = emptyList(),
-    val playingItemId: String? = null,
     val errorMessage: String? = null,
     val usingFallback: Boolean = false,
     val isAiLoading: Boolean = false,

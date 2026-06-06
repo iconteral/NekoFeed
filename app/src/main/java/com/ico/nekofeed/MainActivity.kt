@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.lifecycle.lifecycleScope
 import com.ico.nekofeed.data.local.TokenManager
 import com.ico.nekofeed.data.remote.RetrofitClient
 import com.ico.nekofeed.data.repository.AuthRepository
@@ -11,7 +12,9 @@ import com.ico.nekofeed.data.repository.UserRepository
 import com.ico.nekofeed.navigation.AppNavHost
 import com.ico.nekofeed.ui.theme.NekoFeedTheme
 import java.util.concurrent.atomic.AtomicReference
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     private var isHandling401 = false
@@ -20,64 +23,54 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        isHandling401 = false
-
         val tokenManager = TokenManager(applicationContext)
         val cachedToken = AtomicReference<String?>(null)
         val cachedDeviceId = AtomicReference<String?>(null)
-        val cachedOnboardingCompleted = AtomicReference<Boolean>(false)
 
-        // 恢复自定义 server endpoint 和 deviceId
-        runBlocking {
-            val serverConfig = tokenManager.getServerConfig()
-            RetrofitClient.updateBaseUrl(serverConfig.baseUrl)
-            cachedDeviceId.set(tokenManager.getDeviceId())
-            cachedOnboardingCompleted.set(tokenManager.isOnboardingCompleted())
-        }
-
-        // tokenProvider 在 OkHttp 线程上调用，AtomicReference 保证可见性
-        RetrofitClient.setTokenProvider {
-            cachedToken.get()
-        }
-        RetrofitClient.setDeviceIdProvider {
-            cachedDeviceId.get()
-        }
-
-        val authRepository = AuthRepository(RetrofitClient.feedApi, tokenManager) { newToken ->
-            cachedToken.set(newToken)
-        }
+        RetrofitClient.setTokenProvider { cachedToken.get() }
+        RetrofitClient.setDeviceIdProvider { cachedDeviceId.get() }
 
         val restartApp: () -> Unit = {
-            val intent = intent
+            val restartIntent = intent
             finish()
-            startActivity(intent)
+            startActivity(restartIntent)
         }
 
-        // 遇到 401 时自动清除登录状态并重启
         RetrofitClient.setUnauthorizedHandler {
             if (!isHandling401 && cachedToken.get() != null) {
                 isHandling401 = true
                 cachedToken.set(null)
-                runBlocking {
+                lifecycleScope.launch {
                     tokenManager.clearAuth()
+                    restartApp()
                 }
-                runOnUiThread { restartApp() }
             }
         }
 
-        runBlocking { authRepository.restoreToken() }
+        lifecycleScope.launch {
+            val startupConfig = withContext(Dispatchers.IO) {
+                tokenManager.getStartupConfig()
+            }
+            RetrofitClient.updateBaseUrl(startupConfig.serverBaseUrl)
+            cachedToken.set(startupConfig.token)
+            cachedDeviceId.set(startupConfig.deviceId)
 
-        val userRepository = UserRepository(RetrofitClient.feedApi)
-        val startDestination = if (cachedOnboardingCompleted.get()) "main" else "onboarding"
+            val authRepository = AuthRepository(RetrofitClient.feedApi, tokenManager) { newToken ->
+                cachedToken.set(newToken)
+            }
+            val userRepository = UserRepository(RetrofitClient.feedApi)
+            val startDestination =
+                if (startupConfig.onboardingCompleted) "main" else "onboarding"
 
-        setContent {
-            NekoFeedTheme {
-                AppNavHost(
-                    authRepository = authRepository,
-                    userRepository = userRepository,
-                    restartApp = restartApp,
-                    startDestination = startDestination
-                )
+            setContent {
+                NekoFeedTheme {
+                    AppNavHost(
+                        authRepository = authRepository,
+                        userRepository = userRepository,
+                        restartApp = restartApp,
+                        startDestination = startDestination
+                    )
+                }
             }
         }
     }

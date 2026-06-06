@@ -114,6 +114,13 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
 
         viewModelScope.launch {
             _uiState.update { it.copy(isLoggingIn = true, loginError = null) }
+
+            // 先更新 RetrofitClient 的 baseUrl，确保登录请求发送到正确的服务器
+            if (!state.useMockMode) {
+                val serverUrl = state.serverUrl.trim().ifEmpty { TokenManager.DEFAULT_SERVER_BASE_URL }
+                RetrofitClient.updateBaseUrl(serverUrl)
+            }
+
             val result = authRepository.login(state.loginUsername, state.loginPassword)
             result.fold(
                 onSuccess = {

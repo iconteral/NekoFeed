@@ -26,6 +26,13 @@ data class ServerConfig(
     val baseUrl: String = "http://10.0.2.2:8000"
 )
 
+data class StartupConfig(
+    val serverBaseUrl: String,
+    val token: String?,
+    val deviceId: String,
+    val onboardingCompleted: Boolean
+)
+
 class TokenManager(private val context: Context) {
 
     companion object {
@@ -88,6 +95,19 @@ class TokenManager(private val context: Context) {
 
     suspend fun getServerConfig(): ServerConfig {
         return serverConfig.first()
+    }
+
+    suspend fun getStartupConfig(): StartupConfig {
+        val preferences = context.dataStore.data.first()
+        val deviceId = preferences[DEVICE_ID_KEY] ?: UUID.randomUUID().toString().also { newId ->
+            context.dataStore.edit { it[DEVICE_ID_KEY] = newId }
+        }
+        return StartupConfig(
+            serverBaseUrl = preferences[SERVER_BASE_URL_KEY] ?: DEFAULT_SERVER_BASE_URL,
+            token = preferences[TOKEN_KEY],
+            deviceId = deviceId,
+            onboardingCompleted = preferences[ONBOARDING_COMPLETED_KEY] ?: false
+        )
     }
 
     suspend fun saveLlmConfig(config: LlmConfig) {

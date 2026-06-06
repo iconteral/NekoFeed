@@ -33,6 +33,10 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow(FeedUiState())
     val uiState: StateFlow<FeedUiState> = _uiState.asStateFlow()
 
+    // 分离 playingItemId，避免滑动时触发全局重组
+    private val _playingItemId = MutableStateFlow<String?>(null)
+    val playingItemId: StateFlow<String?> = _playingItemId.asStateFlow()
+
     private var allItems: List<FeedItem> = emptyList()
     private val pageSize = 20
     private var currentOffset = 0
@@ -277,7 +281,7 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun setPlayingItemId(id: String?) {
-        _uiState.update { it.copy(playingItemId = id) }
+        _playingItemId.value = id
     }
 
     fun toggleLike(itemId: String) {
@@ -403,21 +407,24 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
         if (exposedItems.contains(itemId)) return
         exposedItems.add(itemId)
 
+        // 只更新内存数据，不触发UI重组
+        // 曝光计数会在下次加载时同步到服务端
         allItems = allItems.map { item ->
             if (item.id == itemId) {
                 item.copy(exposureCount = item.exposureCount + 1)
             } else item
         }
-        updateFilteredItems()
+        // 移除 updateFilteredItems()，避免滑动时频繁重组
     }
 
     fun recordClick(itemId: String) {
+        // 只更新内存数据，不触发UI重组
         allItems = allItems.map { item ->
             if (item.id == itemId) {
                 item.copy(clickCount = item.clickCount + 1)
             } else item
         }
-        updateFilteredItems()
+        // 移除 updateFilteredItems()，避免频繁重组
 
         viewModelScope.launch {
             userRepository.recordHistory(itemId)
