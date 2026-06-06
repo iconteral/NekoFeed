@@ -57,22 +57,21 @@ fun LargeImageFeedCard(
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier) {
-        // 大图区域
+        // 大图区域 - 使用骨架屏
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(220.dp)
         ) {
+            SkeletonImage(
+                imageUrl = item.imageUrl,
+                contentDescription = item.title,
+                modifier = Modifier.fillMaxWidth(),
+                height = 220.dp
+            )
+
+            // 渐变遮罩 - 只在有图片时显示
             if (item.imageUrl != null) {
-                AsyncImage(
-                    model = item.imageUrl,
-                    contentDescription = item.title,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(220.dp),
-                    contentScale = ContentScale.Crop
-                )
-                // 渐变遮罩
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -87,19 +86,6 @@ fun LargeImageFeedCard(
                             )
                         )
                 )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(220.dp)
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "📷",
-                        style = MaterialTheme.typography.displayMedium
-                    )
-                }
             }
 
             // 品牌标签

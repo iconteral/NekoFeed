@@ -11,7 +11,7 @@ object RetrofitClient {
     private var baseUrl: String = TokenManager.DEFAULT_SERVER_BASE_URL
 
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
-        level = HttpLoggingInterceptor.Level.BODY
+        level = HttpLoggingInterceptor.Level.BASIC
     }
 
     private var tokenProvider: (() -> String?)? = null

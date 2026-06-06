@@ -68,22 +68,21 @@ fun ProductFeedCard(
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     Column(modifier = modifier) {
-        // 商品图片区域
+        // 商品图片区域 - 使用骨架屏
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(200.dp)
         ) {
+            SkeletonImage(
+                imageUrl = item.imageUrl,
+                contentDescription = item.title,
+                modifier = Modifier.fillMaxWidth(),
+                height = 200.dp
+            )
+
+            // 渐变遮罩 - 只在有图片时显示
             if (item.imageUrl != null) {
-                AsyncImage(
-                    model = item.imageUrl,
-                    contentDescription = item.title,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp),
-                    contentScale = ContentScale.Crop
-                )
-                // 渐变遮罩
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -98,19 +97,6 @@ fun ProductFeedCard(
                             )
                         )
                 )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp)
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "🛍️",
-                        style = MaterialTheme.typography.displayMedium
-                    )
-                }
             }
 
             // 品牌标签

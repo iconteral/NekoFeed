@@ -59,6 +59,8 @@ fun AppNavHost(
         composable("onboarding") {
             OnboardingScreen(
                 onComplete = {
+                    // 刷新登录状态，确保从 Onboarding 登录后状态同步
+                    authViewModel.refreshLoginStatus()
                     if (!navController.popBackStack()) {
                         navController.navigate("main") {
                             popUpTo("onboarding") { inclusive = true }

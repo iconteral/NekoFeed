@@ -1,7 +1,9 @@
 package com.ico.nekofeed.data.model
 
+import androidx.compose.runtime.Immutable
 import com.google.gson.annotations.SerializedName
 
+@Immutable
 data class FeedItem(
     val id: String,
 

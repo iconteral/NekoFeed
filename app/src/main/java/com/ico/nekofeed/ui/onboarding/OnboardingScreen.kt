@@ -817,27 +817,33 @@ internal fun LoginPage(
         Spacer(modifier = Modifier.height(32.dp))
 
         if (isLoggedIn) {
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = AccentGreen.copy(alpha = 0.1f)
+            AnimatedVisibility(
+                visible = true,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = AccentGreen.copy(alpha = 0.1f)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = null,
-                        tint = AccentGreen,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = "登录成功！",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = AccentGreen,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Row(
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            tint = AccentGreen,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "登录成功！",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = AccentGreen,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         } else {
