@@ -13,6 +13,7 @@ data class FeedUiState(
     val items: List<FeedItem> = emptyList(),
     val selectedCategory: FeedCategory = FeedCategory.FEATURED,
     val selectedTags: List<String> = emptyList(),
+    val availableTags: List<String> = emptyList(),
     val errorMessage: String? = null,
     val usingFallback: Boolean = false,
     val isAiLoading: Boolean = false,

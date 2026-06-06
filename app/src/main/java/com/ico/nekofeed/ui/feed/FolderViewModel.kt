@@ -111,6 +111,7 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
                             isLoading = false,
                             isRefreshing = false,
                             items = mergedItems,
+                            availableTags = collectAvailableTags(mergedItems),
                             errorMessage = null,
                             usingFallback = false,
                             hasMore = mergedItems.size >= pageSize
@@ -126,6 +127,9 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
                             isLoading = false,
                             isRefreshing = false,
                             items = filterByCategory(fallbackItems, category),
+                            availableTags = collectAvailableTags(
+                                filterByCategory(fallbackItems, category)
+                            ),
                             errorMessage = "无法连接服务器: ${error.message}",
                             usingFallback = true,
                             hasMore = false
@@ -164,6 +168,7 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
                             it.copy(
                                 isLoadingMore = false,
                                 items = allItems,
+                                availableTags = collectAvailableTags(allItems),
                                 hasMore = mergedItems.size >= pageSize
                             )
                         }
@@ -298,7 +303,8 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update {
             it.copy(
                 selectedCategory = category,
-                selectedTags = emptyList()
+                selectedTags = emptyList(),
+                availableTags = emptyList()
             )
         }
         exposedItems.clear()
@@ -426,6 +432,12 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
         updateFilteredItems()
     }
 
+    fun clearTagFilters() {
+        if (_uiState.value.selectedTags.isEmpty()) return
+        _uiState.update { it.copy(selectedTags = emptyList()) }
+        updateFilteredItems()
+    }
+
     fun recordExposure(itemId: String) {
         if (exposedItems.contains(itemId)) return
         exposedItems.add(itemId)
@@ -517,12 +529,33 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
         val category = _uiState.value.selectedCategory
         val tags = _uiState.value.selectedTags
         var filtered = filterByCategory(allItems, category)
+        val availableTags = collectAvailableTags(filtered)
         if (tags.isNotEmpty()) {
             filtered = filtered.filter { item ->
                 tags.any { tag -> item.displayTags.contains(tag) }
             }
         }
-        _uiState.update { it.copy(items = filtered) }
+        _uiState.update {
+            it.copy(
+                items = filtered,
+                availableTags = availableTags
+            )
+        }
+    }
+
+    private fun collectAvailableTags(items: List<FeedItem>): List<String> {
+        return items
+            .flatMap { it.displayTags }
+            .filter { it.isNotBlank() }
+            .groupingBy { it }
+            .eachCount()
+            .entries
+            .sortedWith(
+                compareByDescending<Map.Entry<String, Int>> { it.value }
+                    .thenBy { it.key }
+            )
+            .map { it.key }
+            .take(16)
     }
 
     private suspend fun mergeLocalState(items: List<FeedItem>): List<FeedItem> {
