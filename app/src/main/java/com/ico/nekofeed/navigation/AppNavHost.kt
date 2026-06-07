@@ -11,7 +11,6 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.WindowInsets
@@ -209,10 +208,9 @@ private fun MainScreen(
                         stiffness = Spring.StiffnessMediumLow
                     )
                 ),
-                exit = fadeOut() + slideOutVertically(
-                    targetOffsetY = { it / 2 },
-                    animationSpec = spring(stiffness = Spring.StiffnessMedium)
-                )
+                // Remove the app bottom bar from Scaffold layout immediately. Keeping it
+                // during an exit animation temporarily pushes detail-screen bottom bars up.
+                exit = ExitTransition.None
             ) {
                 NekoFeedBottomNavigationBar(
                     currentRoute = currentRoute,
