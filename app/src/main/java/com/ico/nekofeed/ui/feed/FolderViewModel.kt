@@ -254,6 +254,13 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
                 "${tokenManager.isMockMode()}|${tokenManager.getServerConfig().baseUrl}"
             val sourceChanged = sourceSignature != loadedSourceSignature
             loadedSourceSignature = sourceSignature
+
+            // Returning from detail recreates FeedScreen's composition. Keep the
+            // already loaded pages so LazyListState can restore the exact item.
+            if (!shouldReloadFeedOnEnter(sourceChanged, allItems.isNotEmpty())) {
+                return@launch
+            }
+
             startFeedLoad(
                 clearExisting = sourceChanged,
                 showInitialLoading = allItems.isEmpty()
@@ -740,3 +747,8 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
         PLAY
     }
 }
+
+internal fun shouldReloadFeedOnEnter(
+    sourceChanged: Boolean,
+    hasLoadedItems: Boolean
+): Boolean = sourceChanged || !hasLoadedItems

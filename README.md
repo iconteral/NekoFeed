@@ -60,6 +60,7 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 - OpenAPI：`http://127.0.0.1:8000/docs`
 
 `seed.py` 会写入默认 RSS 源和演示广告。首次抓取可在后台执行刷新；RSS 与外部媒体依赖网络，断网时客户端仍可选择 Mock 模式。
+为此，我们准备了预处理好的数据，可以在 *[飞书网盘](https://my.feishu.cn/file/ESFybgc1YovA3mx0R07c3franUc?from=from_copylink)* 中获得，直接覆盖服务器目录并且运行即可。 
 
 ### 2. 启动 Android App
 
@@ -130,9 +131,14 @@ NekoFeedServer/app/
 - [学习总结](Docs/LEARNING_SUMMARY.md)
 - [指标口径与验收记录](Docs/METRICS_AND_VALIDATION.md)
 - [服务端说明](NekoFeedServer/README.md)
-
+- [性能测试报告](Docs/ANDROID_BENCHMARK_SONY_XQ_DQ72.md)
+- 
 ## AI 使用声明
 
 本项目开发过程中使用了生成式 AI 辅助需求拆解、方案讨论、代码草拟、故障定位和文档整理。所有进入仓库的代码与文档均由开发者结合实际代码审阅、修改，并通过本地编译或测试验证；AI 生成内容不作为正确性的唯一依据。
 
 运行时 AI 仅在用户主动配置兼容接口后启用。仓库不包含第三方模型权重和密钥；发送给模型的内容主要是 Feed 标题、摘要、标签及搜索问题。真实部署前应补充隐私告知、数据脱敏和服务提供方合规评估。
+
+## License
+
+WTFPL

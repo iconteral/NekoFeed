@@ -3,6 +3,9 @@ package com.ico.nekofeed.ui.detail
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.webkit.WebResourceRequest
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -53,6 +56,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -69,6 +73,7 @@ import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -79,6 +84,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.tooling.preview.Preview
 import coil.compose.AsyncImage
 import com.ico.nekofeed.data.model.FeedItem
@@ -522,11 +528,9 @@ private fun ContentSection(item: FeedItem, isAiEnabled: Boolean, onTagClick: ((S
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(bottom = 12.dp)
             )
-            Text(
-                text = detailText,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                lineHeight = MaterialTheme.typography.bodyLarge.lineHeight
+            HtmlContent(
+                html = detailText,
+                baseUrl = item.sourceUrl
             )
         }
 
@@ -589,6 +593,93 @@ private fun ContentSection(item: FeedItem, isAiEnabled: Boolean, onTagClick: ((S
         }
     }
 }
+
+@Suppress("DEPRECATION")
+@Composable
+private fun HtmlContent(html: String, baseUrl: String?) {
+    val context = LocalContext.current
+    val textColor = MaterialTheme.colorScheme.onSurfaceVariant.toArgb().toCssColor()
+    val linkColor = MaterialTheme.colorScheme.primary.toArgb().toCssColor()
+    val fontSize = MaterialTheme.typography.bodyLarge.fontSize.takeIf { it.isSp } ?: 16.sp
+    val lineHeight = MaterialTheme.typography.bodyLarge.lineHeight
+        .takeIf { it.isSp }
+        ?.value
+        ?.div(fontSize.value)
+        ?: 1.5f
+    val document = remember(html, textColor, linkColor, fontSize, lineHeight) {
+        """
+            <!doctype html>
+            <html>
+            <head>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <style>
+                    html, body { margin: 0; padding: 0; background: transparent; }
+                    body {
+                        color: $textColor;
+                        font-family: sans-serif;
+                        font-size: ${fontSize.value}px;
+                        line-height: $lineHeight;
+                        overflow-wrap: anywhere;
+                    }
+                    p:first-child, h1:first-child, h2:first-child, h3:first-child { margin-top: 0; }
+                    p:last-child { margin-bottom: 0; }
+                    img, video, iframe { max-width: 100%; height: auto; }
+                    pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+                    a { color: $linkColor; }
+                </style>
+            </head>
+            <body>$html</body>
+            </html>
+        """.trimIndent()
+    }
+    var contentHeightDp by remember(html) { mutableIntStateOf(1) }
+
+    AndroidView(
+        factory = { ctx ->
+            WebView(ctx).apply {
+                setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                isVerticalScrollBarEnabled = false
+                overScrollMode = WebView.OVER_SCROLL_NEVER
+                settings.javaScriptEnabled = false
+                settings.domStorageEnabled = false
+                settings.allowFileAccess = false
+                settings.allowContentAccess = false
+                webViewClient = object : WebViewClient() {
+                    override fun shouldOverrideUrlLoading(
+                        view: WebView,
+                        request: WebResourceRequest
+                    ): Boolean {
+                        openUrl(context, request.url.toString())
+                        return true
+                    }
+                }
+                setPictureListener { view, _ ->
+                    // contentHeight is in CSS pixels, which map to dp with our viewport.
+                    // Applying view.scale again can exceed Compose's constraint range.
+                    val measuredHeight = view.contentHeight.coerceAtLeast(1)
+                    val boundedHeight = measuredHeight.coerceAtMost(MAX_HTML_HEIGHT_DP)
+                    view.isVerticalScrollBarEnabled = measuredHeight > MAX_HTML_HEIGHT_DP
+                    if (boundedHeight != contentHeightDp) {
+                        contentHeightDp = boundedHeight
+                    }
+                }
+            }
+        },
+        update = { webView ->
+            if (webView.tag != document) {
+                webView.tag = document
+                webView.loadDataWithBaseURL(baseUrl, document, "text/html", "UTF-8", null)
+            }
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(contentHeightDp.dp)
+    )
+}
+
+private const val MAX_HTML_HEIGHT_DP = 20_000
+
+private fun Int.toCssColor(): String = "#%06X".format(this and 0xFFFFFF)
 
 @Composable
 private fun StatItem(label: String, value: Int) {
