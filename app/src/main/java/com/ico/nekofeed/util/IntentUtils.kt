@@ -1,8 +1,11 @@
 package com.ico.nekofeed.util
 
+import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 
 object IntentUtils {
     fun shareContent(context: Context, title: String, content: String, url: String?) {
@@ -10,13 +13,20 @@ object IntentUtils {
             type = "text/plain"
             val shareText = buildString {
                 appendLine(title)
-                if (content.isNotBlank()) appendLine(content.take(100) + "...")
+                if (content.isNotBlank()) appendLine(content.take(100))
                 if (!url.isNullOrBlank()) appendLine(url)
-            }
+            }.trim()
             putExtra(Intent.EXTRA_TEXT, shareText)
             putExtra(Intent.EXTRA_TITLE, title)
         }
-        context.startActivity(Intent.createChooser(shareIntent, "分享到..."))
+        val chooser = Intent.createChooser(shareIntent, "分享到...").apply {
+            if (context !is Activity) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        try {
+            context.startActivity(chooser)
+        } catch (_: ActivityNotFoundException) {
+            Toast.makeText(context, "未找到可用的分享应用", Toast.LENGTH_SHORT).show()
+        }
     }
 
     fun openUrl(context: Context, url: String?) {

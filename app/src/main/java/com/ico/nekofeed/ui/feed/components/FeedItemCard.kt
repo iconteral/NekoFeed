@@ -6,9 +6,11 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.ico.nekofeed.data.model.FeedCardType
 import com.ico.nekofeed.data.model.FeedItem
+import com.ico.nekofeed.util.IntentUtils
 
 @Composable
 fun FeedItemCard(
@@ -20,10 +22,21 @@ fun FeedItemCard(
     onTagClick: ((String) -> Unit)? = null,
     isAiEnabled: Boolean = true,
     isPlaying: Boolean = false,
+    onPlaybackStarted: (String) -> Unit = {},
     onMuteToggle: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val cardType = FeedCardType.fromString(item.cardType)
+    val shareItem: (String) -> Unit = { itemId ->
+        onShareClick?.invoke(itemId)
+        IntentUtils.shareContent(
+            context = context,
+            title = item.title,
+            content = item.displaySummary,
+            url = item.sourceUrl
+        )
+    }
 
     Card(
         onClick = onClick,
@@ -42,7 +55,7 @@ fun FeedItemCard(
                 item = item,
                 onLikeClick = onLikeClick,
                 onCollectClick = onCollectClick,
-                onShareClick = onShareClick,
+                onShareClick = shareItem,
                 onTagClick = onTagClick,
                 isAiEnabled = isAiEnabled
             )
@@ -50,7 +63,7 @@ fun FeedItemCard(
                 item = item,
                 onLikeClick = onLikeClick,
                 onCollectClick = onCollectClick,
-                onShareClick = onShareClick,
+                onShareClick = shareItem,
                 onTagClick = onTagClick,
                 isAiEnabled = isAiEnabled
             )
@@ -58,17 +71,18 @@ fun FeedItemCard(
                 item = item,
                 onLikeClick = onLikeClick,
                 onCollectClick = onCollectClick,
-                onShareClick = onShareClick,
+                onShareClick = shareItem,
                 onTagClick = onTagClick,
                 isAiEnabled = isAiEnabled,
                 isPlaying = isPlaying,
+                onPlaybackStarted = onPlaybackStarted,
                 onMuteToggle = onMuteToggle
             )
             FeedCardType.PRODUCT -> ProductFeedCard(
                 item = item,
                 onLikeClick = onLikeClick,
                 onCollectClick = onCollectClick,
-                onShareClick = onShareClick,
+                onShareClick = shareItem,
                 onTagClick = onTagClick,
                 isAiEnabled = isAiEnabled
             )
@@ -76,7 +90,7 @@ fun FeedItemCard(
                 item = item,
                 onLikeClick = onLikeClick,
                 onCollectClick = onCollectClick,
-                onShareClick = onShareClick,
+                onShareClick = shareItem,
                 onTagClick = onTagClick,
                 isAiEnabled = isAiEnabled
             )

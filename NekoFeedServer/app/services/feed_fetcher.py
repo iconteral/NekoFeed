@@ -13,7 +13,16 @@ async def process_feed_item(db: Session, normalized_data: dict):
     # Check if item already exists by ID
     existing_item = db.query(FeedItem).filter(FeedItem.id == normalized_data['id']).first()
     if existing_item:
-        return # Skip
+        changed = False
+        if not (existing_item.content or '').strip() and normalized_data.get('content'):
+            existing_item.content = normalized_data['content']
+            changed = True
+        if not (existing_item.summary or '').strip() and normalized_data.get('summary'):
+            existing_item.summary = normalized_data['summary']
+            changed = True
+        if changed:
+            db.commit()
+        return
 
     # Attempt to download media if present
     image_url = normalized_data.get('image_url')

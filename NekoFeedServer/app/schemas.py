@@ -70,6 +70,7 @@ class FeedItemResponse(BaseModel):
     isCollected: bool = Field(False, alias="is_collected")
     likeCount: int = Field(0, alias="like_count")
     collectCount: int = Field(0, alias="collect_count")
+    clickCount: int = Field(0, alias="click_count")
     shareCount: int = Field(0, alias="share_count")
     
     class Config:

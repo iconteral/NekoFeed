@@ -43,7 +43,7 @@ class AiRepository(
         if (config.baseUrl.isBlank()) return null
 
         if (cachedApi == null || cachedBaseUrl != config.baseUrl) {
-            cachedApi = LlmClientFactory.create(config.baseUrl)
+            cachedApi = LlmClientFactory.create(config.baseUrl, timeoutSeconds = 20)
             cachedBaseUrl = config.baseUrl
         }
         return cachedApi
@@ -56,13 +56,15 @@ class AiRepository(
         if (!config.aiEnabled) return null
 
         val cached = aiCacheDao.getCache(item.id)
-        if (cached != null) {
+        if (!cached?.aiSummary.isNullOrBlank()) {
             return AiResult(
-                aiSummary = cached.aiSummary,
+                aiSummary = cached!!.aiSummary,
                 aiTags = parseTagsFromJson(cached.aiTags),
                 aiReason = cached.aiReason,
                 fromCache = true
             )
+        } else if (cached != null) {
+            aiCacheDao.deleteCache(item.id)
         }
 
         val api = getApi() ?: return null
@@ -88,7 +90,7 @@ class AiRepository(
         val auth = if (config.apiKey.isNotBlank()) "Bearer ${config.apiKey}" else ""
 
         var retryCount = 0
-        val maxRetries = 3
+        val maxRetries = 1
         var backoffMs = 1000L
 
         while (retryCount <= maxRetries) {
@@ -97,6 +99,10 @@ class AiRepository(
                 val content = response.choices.firstOrNull()?.message?.content ?: return null
 
                 val parsed = parseAiResponse(content)
+
+                if (parsed.aiSummary.isNullOrBlank()) {
+                    throw IllegalStateException("LLM response did not contain a summary")
+                }
 
                 aiCacheDao.insertCache(
                     AiCacheEntity(
@@ -125,28 +131,7 @@ class AiRepository(
             }
         }
 
-        // Fallback when retries are exhausted
-        val fallbackTags = item.tags.orEmpty()
-        try {
-            aiCacheDao.insertCache(
-                AiCacheEntity(
-                    itemId = item.id,
-                    aiSummary = null,
-                    aiTags = gson.toJson(fallbackTags),
-                    aiReason = null,
-                    modelUsed = config.model + "-fallback"
-                )
-            )
-        } catch (dbEx: Exception) {
-            dbEx.printStackTrace()
-        }
-
-        return AiResult(
-            aiSummary = null,
-            aiTags = fallbackTags,
-            aiReason = null,
-            fromCache = false
-        )
+        return null
     }
 
     suspend fun parseSearchQuery(query: String, userProfileTags: List<String>): SearchIntent? {
@@ -271,10 +256,15 @@ item_types 可选值：article, video, ad, product, local
         val config = getConfig()
         val api = getApi() ?: return null
 
+        val requestMessages = buildList {
+            messages.firstOrNull { it.role == "system" }?.let(::add)
+            addAll(messages.filterNot { it.role == "system" }.takeLast(12))
+        }
+
         val request = ChatRequest(
             model = config.model,
-            messages = messages,
-            max_tokens = 1024,
+            messages = requestMessages,
+            max_tokens = 4096,
             temperature = 0.7f
         )
 

@@ -72,8 +72,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.Font
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -83,6 +81,7 @@ import com.ico.nekofeed.R
 import com.ico.nekofeed.data.local.FallbackFeedData
 import com.ico.nekofeed.data.model.FeedCategory
 import com.ico.nekofeed.data.model.FeedItem
+import com.ico.nekofeed.ui.components.SparklesIcon
 import com.ico.nekofeed.ui.feed.components.FeedItemCard
 import com.ico.nekofeed.ui.feed.components.FeedTagChip
 import com.ico.nekofeed.util.FeedUiState
@@ -92,8 +91,6 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import androidx.compose.ui.unit.sp
-private val NotoEmojiFont = FontFamily(Font(resId = R.font.noto_emoji_regular))
 private val FeedCategories = listOf(
     FeedCategory.FEATURED,
     FeedCategory.SHOPPING,
@@ -156,6 +153,7 @@ fun FeedScreen(
         onClearTags = viewModel::clearTagFilters,
         onAiRequest = viewModel::requestAiAnalysis,
         onExposure = viewModel::recordExposure,
+        onPlaybackStarted = viewModel::recordPlaybackStarted,
         onPlayingItemChange = viewModel::setPlayingItemId
     )
 }
@@ -180,6 +178,7 @@ fun FeedScreenContent(
     onClearTags: () -> Unit,
     onAiRequest: (FeedItem) -> Unit,
     onExposure: (String) -> Unit = {},
+    onPlaybackStarted: (String) -> Unit = {},
     onPlayingItemChange: (String?) -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -242,7 +241,9 @@ fun FeedScreenContent(
                         AsyncImage(
                             model = R.raw.neko_cat,
                             contentDescription = null,
-                            modifier = Modifier.size(25.dp)
+                            modifier = Modifier
+                                .size(35.dp)
+                                .padding(bottom = 4.dp)
                         )
                     }
                     Spacer(modifier = Modifier.width(8.dp))
@@ -255,10 +256,23 @@ fun FeedScreenContent(
             },
             actions = {
                 IconButton(onClick = onSearchClick) {
-                    Icon(
-                        imageVector = Icons.Filled.Search,
-                        contentDescription = "搜索"
-                    )
+                    Box(
+                        modifier = Modifier.size(32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Search,
+                            contentDescription = "搜索"
+                        )
+                        SparklesIcon(
+                            size = 12.dp,
+                            monochrome = true,
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(bottom = 6.dp)
+                        )
+                    }
                 }
             },
             colors = TopAppBarDefaults.topAppBarColors(
@@ -359,6 +373,7 @@ fun FeedScreenContent(
                                     onTagClick = onTagClick,
                                     onAiRequest = onAiRequest,
                                     onExposure = onExposure,
+                                    onPlaybackStarted = onPlaybackStarted,
                                     onPlayingItemChange = onPlayingItemChange
                                 )
                             }
@@ -370,23 +385,18 @@ fun FeedScreenContent(
         }
 
         // FAB
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp)
-        ) {
-            FloatingActionButton(
-                onClick = { onSearchClick() },
-                containerColor = MaterialTheme.colorScheme.primaryContainer
-            ) {
-                Text(
-                    text = "✨",
-                    fontSize = MaterialTheme.typography.titleLarge.fontSize,
-                    fontFamily = NotoEmojiFont,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
-            }
-        }
+//        Box(
+//            modifier = Modifier
+//                .align(Alignment.BottomEnd)
+//                .padding(16.dp)
+//        ) {
+//            FloatingActionButton(
+//                onClick = { onSearchClick() },
+//                containerColor = MaterialTheme.colorScheme.primaryContainer
+//            ) {
+//                SparklesIcon(size = 24.dp)
+//            }
+//        }
     }
 }
 
@@ -557,10 +567,10 @@ private fun FeedContent(
     onTagClick: (String) -> Unit,
     onAiRequest: (FeedItem) -> Unit,
     onExposure: (String) -> Unit,
+    onPlaybackStarted: (String) -> Unit,
     onPlayingItemChange: (String?) -> Unit,
     playingItemId: String?
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
     // Infinite scroll detection: trigger loadMore when scrolled near the bottom
     LaunchedEffect(listState) {
         snapshotFlow {
@@ -626,11 +636,24 @@ private fun FeedContent(
                     return@collectLatest
                 }
 
-                delay(350L)
+                delay(1_000L)
 
                 val layoutInfo = listState.layoutInfo
                 val visibleItems = layoutInfo.visibleItemsInfo
                 visibleItems
+                    .filter { itemInfo ->
+                        val visibleStart = maxOf(
+                            itemInfo.offset,
+                            layoutInfo.viewportStartOffset
+                        )
+                        val visibleEnd = minOf(
+                            itemInfo.offset + itemInfo.size,
+                            layoutInfo.viewportEndOffset
+                        )
+                        val visiblePixels = (visibleEnd - visibleStart).coerceAtLeast(0)
+                        itemInfo.size > 0 &&
+                            visiblePixels.toFloat() / itemInfo.size >= 0.5f
+                    }
                     .mapNotNull { it.key as? String }
                     .forEach(currentOnExposure)
 
@@ -698,18 +721,11 @@ private fun FeedContent(
                 onClick = { onItemClick(item.id) },
                 onLikeClick = onLikeClick,
                 onCollectClick = onCollectClick,
-                onShareClick = {
-                    onShareClick(it)
-                    com.ico.nekofeed.util.IntentUtils.shareContent(
-                        context = context,
-                        title = item.title,
-                        content = item.summary ?: "",
-                        url = item.sourceUrl
-                    )
-                },
+                onShareClick = onShareClick,
                 onTagClick = onTagClick,
                 isAiEnabled = isAiEnabled,
                 isPlaying = item.id == playingItemId,
+                onPlaybackStarted = onPlaybackStarted,
                 onMuteToggle = { /* handled internally or by global state if needed */ },
                 modifier = Modifier.animateItem()
             )

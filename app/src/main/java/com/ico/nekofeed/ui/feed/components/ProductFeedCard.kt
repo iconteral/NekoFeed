@@ -53,6 +53,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.ico.nekofeed.data.model.FeedItem
+import com.ico.nekofeed.ui.components.SparklesIcon
 import androidx.compose.material3.LinearWavyProgressIndicator
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -170,9 +171,8 @@ fun ProductFeedCard(
                                 .padding(10.dp, 12.dp),
                             verticalAlignment = Alignment.Top
                         ) {
-                            Text(
-                                text = "✨",
-                                style = MaterialTheme.typography.bodySmall,
+                            SparklesIcon(
+                                size = 14.dp,
                                 modifier = Modifier.padding(end = 8.dp)
                             )
                             Text(
@@ -214,10 +214,7 @@ fun ProductFeedCard(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.padding(bottom = 8.dp)
                         ) {
-                            Text(
-                                text = "✨",
-                                style = MaterialTheme.typography.bodySmall
-                            )
+                            SparklesIcon(size = 14.dp)
                             Text(
                                 text = "AI 正在分析商品卖点与特征...",
                                 style = MaterialTheme.typography.labelSmall,
@@ -303,15 +300,7 @@ fun ProductFeedCard(
 
                 // 分享
                 IconButton(
-                    onClick = { 
-                        onShareClick?.invoke(item.id)
-                        com.ico.nekofeed.util.IntentUtils.shareContent(
-                            context = context,
-                            title = item.title,
-                            content = item.summary ?: "",
-                            url = item.sourceUrl
-                        )
-                    },
+                    onClick = { onShareClick?.invoke(item.id) },
                     modifier = Modifier.size(18.dp)
                 ) {
                     Icon(

@@ -44,8 +44,12 @@ def toggle_like(
 
     db.commit()
 
-    like_count = db.query(UserLike).filter(UserLike.item_id == item_id).count()
-    collect_count = db.query(UserCollect).filter(UserCollect.item_id == item_id).count()
+    like_count = item.base_like_count + db.query(UserLike).filter(
+        UserLike.item_id == item_id
+    ).count()
+    collect_count = item.base_collect_count + db.query(UserCollect).filter(
+        UserCollect.item_id == item_id
+    ).count()
     is_collected = db.query(UserCollect).filter(
         UserCollect.user_id == current_user.id,
         UserCollect.item_id == item_id
@@ -87,8 +91,12 @@ def toggle_collect(
 
     db.commit()
 
-    like_count = db.query(UserLike).filter(UserLike.item_id == item_id).count()
-    collect_count = db.query(UserCollect).filter(UserCollect.item_id == item_id).count()
+    like_count = item.base_like_count + db.query(UserLike).filter(
+        UserLike.item_id == item_id
+    ).count()
+    collect_count = item.base_collect_count + db.query(UserCollect).filter(
+        UserCollect.item_id == item_id
+    ).count()
     is_liked = db.query(UserLike).filter(
         UserLike.user_id == current_user.id,
         UserLike.item_id == item_id
@@ -142,8 +150,16 @@ def get_item_interaction(
     current_user: Optional[User] = Depends(get_optional_user),
     db: Session = Depends(get_db)
 ):
-    like_count = db.query(UserLike).filter(UserLike.item_id == item_id).count()
-    collect_count = db.query(UserCollect).filter(UserCollect.item_id == item_id).count()
+    item = db.query(FeedItem).filter(FeedItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    like_count = item.base_like_count + db.query(UserLike).filter(
+        UserLike.item_id == item_id
+    ).count()
+    collect_count = item.base_collect_count + db.query(UserCollect).filter(
+        UserCollect.item_id == item_id
+    ).count()
 
     is_liked = False
     is_collected = False
@@ -181,7 +197,7 @@ def get_user_likes(
     items = query.order_by(UserLike.created_at.desc()).offset(offset).limit(limit).all()
 
     return {
-        "items": [_item_to_dict(item) for item in items],
+        "items": _items_to_dict(db, items, current_user.id),
         "total": total,
         "limit": limit,
         "offset": offset
@@ -203,7 +219,7 @@ def get_user_collections(
     items = query.order_by(UserCollect.created_at.desc()).offset(offset).limit(limit).all()
 
     return {
-        "items": [_item_to_dict(item) for item in items],
+        "items": _items_to_dict(db, items, current_user.id),
         "total": total,
         "limit": limit,
         "offset": offset
@@ -225,7 +241,7 @@ def get_user_history(
     items = query.order_by(UserHistory.viewed_at.desc()).offset(offset).limit(limit).all()
 
     return {
-        "items": [_item_to_dict(item) for item in items],
+        "items": _items_to_dict(db, items, current_user.id),
         "total": total,
         "limit": limit,
         "offset": offset
@@ -432,7 +448,57 @@ def get_user_profile(
     )
 
 
-def _item_to_dict(item: FeedItem) -> dict:
+def _items_to_dict(db: Session, items: List[FeedItem], user_id: int) -> List[dict]:
+    item_ids = [item.id for item in items]
+    if not item_ids:
+        return []
+
+    like_counts = dict(
+        db.query(UserLike.item_id, func.count(UserLike.id))
+        .filter(UserLike.item_id.in_(item_ids))
+        .group_by(UserLike.item_id)
+        .all()
+    )
+    collect_counts = dict(
+        db.query(UserCollect.item_id, func.count(UserCollect.id))
+        .filter(UserCollect.item_id.in_(item_ids))
+        .group_by(UserCollect.item_id)
+        .all()
+    )
+    user_likes = {
+        item_id
+        for item_id, in db.query(UserLike.item_id).filter(
+            UserLike.user_id == user_id,
+            UserLike.item_id.in_(item_ids)
+        ).all()
+    }
+    user_collects = {
+        item_id
+        for item_id, in db.query(UserCollect.item_id).filter(
+            UserCollect.user_id == user_id,
+            UserCollect.item_id.in_(item_ids)
+        ).all()
+    }
+
+    return [
+        _item_to_dict(
+            item,
+            is_liked=item.id in user_likes,
+            is_collected=item.id in user_collects,
+            like_count=item.base_like_count + like_counts.get(item.id, 0),
+            collect_count=item.base_collect_count + collect_counts.get(item.id, 0)
+        )
+        for item in items
+    ]
+
+
+def _item_to_dict(
+    item: FeedItem,
+    is_liked: bool = False,
+    is_collected: bool = False,
+    like_count: int = 0,
+    collect_count: int = 0
+) -> dict:
     return {
         "id": item.id,
         "title": item.title,
@@ -455,4 +521,8 @@ def _item_to_dict(item: FeedItem) -> dict:
         "ai_tags": item.ai_tags.split(',') if item.ai_tags else [],
         "ai_reason": item.ai_reason,
         "ai_enriched": item.ai_enriched or False,
+        "is_liked": is_liked,
+        "is_collected": is_collected,
+        "like_count": like_count,
+        "collect_count": collect_count,
     }

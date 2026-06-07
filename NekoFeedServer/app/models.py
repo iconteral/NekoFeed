@@ -51,6 +51,11 @@ class FeedItem(Base):
     ai_reason = Column(String, nullable=True)
     ai_enriched = Column(Boolean, default=False)
 
+    # Anonymous baseline metrics, independent of user interaction rows.
+    base_click_count = Column(Integer, default=0, nullable=False)
+    base_like_count = Column(Integer, default=0, nullable=False)
+    base_collect_count = Column(Integer, default=0, nullable=False)
+
 
 class SystemSetting(Base):
     __tablename__ = "system_settings"

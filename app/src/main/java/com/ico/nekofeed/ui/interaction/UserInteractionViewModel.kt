@@ -83,7 +83,9 @@ class UserInteractionViewModel(application: Application) : AndroidViewModel(appl
                 )
             }
 
-            val offset = if (isRefresh) 0 else _uiState.value.currentPage * pageSize
+            // Items can be removed in-place after an unlike/uncollect. Using the
+            // visible item count prevents the next page from skipping a shifted row.
+            val offset = if (isRefresh) 0 else _uiState.value.items.size
 
             if (tokenManager.isMockMode()) {
                 loadMockItems()
@@ -147,15 +149,18 @@ class UserInteractionViewModel(application: Application) : AndroidViewModel(appl
 
     fun toggleLike(itemId: String) {
         viewModelScope.launch {
+            val item = _uiState.value.items.firstOrNull { it.id == itemId } ?: return@launch
+            val originalIndex = _uiState.value.items.indexOfFirst { it.id == itemId }
+            val previous = item.toInteraction()
+            val optimistic = previous.copy(
+                isLiked = !item.isLiked,
+                likeCount = (item.likeCount + if (item.isLiked) -1 else 1).coerceAtLeast(0)
+            )
+            applyInteraction(itemId, optimistic)
+            InteractionSyncStore.publish(itemId, optimistic)
+            saveAndPublish(itemId, optimistic)
+
             if (tokenManager.isMockMode()) {
-                val item = _uiState.value.items.firstOrNull { it.id == itemId } ?: return@launch
-                val interaction = ItemInteraction(
-                    isLiked = !item.isLiked,
-                    isCollected = item.isCollected,
-                    likeCount = if (item.isLiked) item.likeCount - 1 else item.likeCount + 1,
-                    collectCount = item.collectCount
-                )
-                saveAndPublish(itemId, interaction)
                 return@launch
             }
 
@@ -163,26 +168,30 @@ class UserInteractionViewModel(application: Application) : AndroidViewModel(appl
                 onSuccess = { interaction ->
                     saveAndPublish(itemId, interaction)
                 },
-                onFailure = { }
+                onFailure = { error ->
+                    restoreItem(item, originalIndex)
+                    saveAndPublish(itemId, previous)
+                    _uiState.update { it.copy(error = error.message ?: "点赞操作失败") }
+                }
             )
         }
     }
 
     fun toggleCollect(itemId: String) {
         viewModelScope.launch {
+            val item = _uiState.value.items.firstOrNull { it.id == itemId } ?: return@launch
+            val originalIndex = _uiState.value.items.indexOfFirst { it.id == itemId }
+            val previous = item.toInteraction()
+            val optimistic = previous.copy(
+                isCollected = !item.isCollected,
+                collectCount = (item.collectCount + if (item.isCollected) -1 else 1)
+                    .coerceAtLeast(0)
+            )
+            applyInteraction(itemId, optimistic)
+            InteractionSyncStore.publish(itemId, optimistic)
+            saveAndPublish(itemId, optimistic)
+
             if (tokenManager.isMockMode()) {
-                val item = _uiState.value.items.firstOrNull { it.id == itemId } ?: return@launch
-                val interaction = ItemInteraction(
-                    isLiked = item.isLiked,
-                    isCollected = !item.isCollected,
-                    likeCount = item.likeCount,
-                    collectCount = if (item.isCollected) {
-                        item.collectCount - 1
-                    } else {
-                        item.collectCount + 1
-                    }
-                )
-                saveAndPublish(itemId, interaction)
                 return@launch
             }
 
@@ -190,7 +199,11 @@ class UserInteractionViewModel(application: Application) : AndroidViewModel(appl
                 onSuccess = { interaction ->
                     saveAndPublish(itemId, interaction)
                 },
-                onFailure = { }
+                onFailure = { error ->
+                    restoreItem(item, originalIndex)
+                    saveAndPublish(itemId, previous)
+                    _uiState.update { it.copy(error = error.message ?: "收藏操作失败") }
+                }
             )
         }
     }
@@ -247,6 +260,18 @@ class UserInteractionViewModel(application: Application) : AndroidViewModel(appl
         }
     }
 
+    private fun restoreItem(item: FeedItem, originalIndex: Int) {
+        _uiState.update { state ->
+            if (state.items.any { it.id == item.id }) {
+                state
+            } else {
+                val restored = state.items.toMutableList()
+                restored.add(originalIndex.coerceIn(0, restored.size), item)
+                state.copy(items = restored)
+            }
+        }
+    }
+
     private suspend fun saveAndPublish(itemId: String, interaction: ItemInteraction) {
         val existing = interactionDao.getInteraction(itemId)
         interactionDao.upsertInteraction(
@@ -261,4 +286,11 @@ class UserInteractionViewModel(application: Application) : AndroidViewModel(appl
         )
         InteractionSyncStore.publish(itemId, interaction)
     }
+
+    private fun FeedItem.toInteraction() = ItemInteraction(
+        isLiked = isLiked,
+        isCollected = isCollected,
+        likeCount = likeCount,
+        collectCount = collectCount
+    )
 }

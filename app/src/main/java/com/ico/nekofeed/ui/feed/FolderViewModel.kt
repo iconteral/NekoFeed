@@ -4,6 +4,10 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.ico.nekofeed.data.local.TokenManager
+import com.ico.nekofeed.data.local.AnalyticsEnvironment
+import com.ico.nekofeed.data.local.FallbackFeedData
+import com.ico.nekofeed.data.local.MockAnalyticsSeeder
+import com.ico.nekofeed.data.local.db.AnalyticsEventEntity
 import com.ico.nekofeed.data.local.db.FeedItemInteractionEntity
 import com.ico.nekofeed.data.local.db.NekoFeedDatabase
 import com.ico.nekofeed.data.model.FeedCategory
@@ -18,15 +22,28 @@ import com.ico.nekofeed.data.repository.UserProfileRepository
 import com.ico.nekofeed.data.repository.UserRepository
 import com.ico.nekofeed.util.FeedUiState
 import com.ico.nekofeed.util.matchesCategory
+import com.ico.nekofeed.ui.stats.AnalyticsEventType
+import com.ico.nekofeed.ui.stats.StatsData
+import com.ico.nekofeed.ui.stats.StatsRange
+import com.ico.nekofeed.ui.stats.aggregateStats
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import java.util.UUID
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class FeedViewModel(application: Application) : AndroidViewModel(application) {
     private val tokenManager = TokenManager(application)
     private val repository = FeedRepository(
@@ -42,6 +59,26 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(FeedUiState())
     val uiState: StateFlow<FeedUiState> = _uiState.asStateFlow()
+    private val _statsRange = MutableStateFlow(StatsRange.WEEK)
+    val statsRange: StateFlow<StatsRange> = _statsRange.asStateFlow()
+    private val analyticsEnvironment = tokenManager.useMockMode
+        .map { if (it) AnalyticsEnvironment.MOCK else AnalyticsEnvironment.LIVE }
+        .stateIn(
+            viewModelScope,
+            SharingStarted.Eagerly,
+            AnalyticsEnvironment.LIVE
+        )
+    val stats: StateFlow<StatsData> = combine(_statsRange, analyticsEnvironment) { range, environment ->
+        range to environment
+    }
+        .flatMapLatest { (range, environment) ->
+            analyticsDao.observeEventsSince(
+                since = System.currentTimeMillis() - range.durationMillis,
+                environment = environment
+            )
+        }
+        .map(::aggregateStats)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), StatsData())
 
     // 分离 playingItemId，避免滑动时触发全局重组
     private val _playingItemId = MutableStateFlow<String?>(null)
@@ -55,12 +92,15 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
     private var loadedSourceSignature: String? = null
 
     private val exposedItems = mutableSetOf<String>()
+    private val playedItems = mutableSetOf<String>()
+    private val analyticsSessionId = UUID.randomUUID().toString()
 
     fun getAllItems(): List<FeedItem> = allItems
 
     init {
         observeLlmConfig()
         observeInteractionUpdates()
+        observeMockAnalyticsSeed()
     }
 
     private fun observeLlmConfig() {
@@ -73,6 +113,21 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
 
     fun loadFeed() {
         startFeedLoad(clearExisting = true, showInitialLoading = true)
+    }
+
+    private fun observeMockAnalyticsSeed() {
+        viewModelScope.launch {
+            tokenManager.useMockMode
+                .distinctUntilChanged()
+                .collect { isMockMode ->
+                    if (isMockMode) {
+                        MockAnalyticsSeeder.seedIfNeeded(
+                            analyticsDao = analyticsDao,
+                            items = FallbackFeedData.items
+                        )
+                    }
+                }
+        }
     }
 
     private fun startFeedLoad(
@@ -119,7 +174,6 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
                             hasMore = !isMockMode && mergedItems.size >= pageSize
                         )
                     }
-                    batchGenerateAi(mergedItems)
                 },
                 onFailure = { error ->
                     val fallbackItems = mergeLocalState(repository.getFallbackData())
@@ -137,7 +191,6 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
                             hasMore = false
                         )
                     }
-                    batchGenerateAi(fallbackItems)
                 }
             )
         }
@@ -174,7 +227,6 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
                                 hasMore = mergedItems.size >= pageSize
                             )
                         }
-                        batchGenerateAi(mergedItems)
                     }
                 },
                 onFailure = { error ->
@@ -206,84 +258,60 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun batchGenerateAi(items: List<FeedItem>) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isAiLoading = true) }
-            try {
-                aiRepository.batchGenerateAi(items)
-                val updatedItems = allItems.map { item ->
-                    val cached = aiRepository.getCache(item.id)
-                    if (cached != null) {
-                        item.copy(
-                            aiSummary = cached.aiSummary ?: item.aiSummary,
-                            aiTags = parseTagsFromCache(cached.aiTags),
-                            aiReason = cached.aiReason ?: item.aiReason
-                        )
-                    } else item
-                }
-                allItems = updatedItems
-                updateFilteredItems()
-            } catch (e: Exception) {
-                e.printStackTrace()
-            } finally {
-                _uiState.update { it.copy(isAiLoading = false) }
-            }
-        }
-    }
-
     private val aiSemaphore = Semaphore(8)
 
     fun requestAiAnalysis(item: FeedItem) {
         if (!item.aiSummary.isNullOrBlank() || item.isAiLoading) return
 
         viewModelScope.launch {
-            val cached = aiRepository.getCache(item.id)
-            if (cached != null) {
-                val updatedTags = parseTagsFromCache(cached.aiTags)
-                allItems = allItems.map { it ->
-                    if (it.id == item.id) {
+            try {
+                val cached = aiRepository.getCache(item.id)
+                if (!cached?.aiSummary.isNullOrBlank()) {
+                    val updatedTags = parseTagsFromCache(cached!!.aiTags)
+                    updateAiItem(item.id) {
                         it.copy(
                             aiSummary = cached.aiSummary,
                             aiTags = updatedTags,
                             aiReason = cached.aiReason,
-                            isAiLoading = false
+                            isAiLoading = false,
+                            isAiFailed = false
                         )
-                    } else it
+                    }
+                    return@launch
                 }
-                updateFilteredItems()
-                return@launch
-            }
 
-            val config = tokenManager.getLlmConfig()
-            if (!config.aiEnabled || config.baseUrl.isBlank()) return@launch
+                val config = tokenManager.getLlmConfig()
+                if (!config.aiEnabled || config.baseUrl.isBlank()) return@launch
 
-            allItems = allItems.map { it ->
-                if (it.id == item.id) {
-                    it.copy(isAiLoading = true)
-                } else it
-            }
-            updateFilteredItems()
+                updateAiItem(item.id) { it.copy(isAiLoading = true, isAiFailed = false) }
 
-            val result = aiSemaphore.withPermit {
-                aiRepository.generateFeedAi(item)
-            }
+                val result = aiSemaphore.withPermit {
+                    aiRepository.generateFeedAi(item)
+                }
 
-            allItems = allItems.map { it ->
-                if (it.id == item.id) {
-                    if (result != null) {
+                updateAiItem(item.id) {
+                    if (!result?.aiSummary.isNullOrBlank()) {
                         it.copy(
-                            aiSummary = result.aiSummary,
+                            aiSummary = result!!.aiSummary,
                             aiTags = result.aiTags,
                             aiReason = result.aiReason,
-                            isAiLoading = false
+                            isAiLoading = false,
+                            isAiFailed = false
                         )
                     } else {
-                        it.copy(isAiLoading = false)
+                        it.copy(isAiLoading = false, isAiFailed = true)
                     }
-                } else it
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                updateAiItem(item.id) { it.copy(isAiLoading = false, isAiFailed = true) }
             }
-            updateFilteredItems()
         }
+    }
+
+    private fun updateAiItem(itemId: String, transform: (FeedItem) -> FeedItem) {
+        allItems = allItems.map { if (it.id == itemId) transform(it) else it }
+        updateFilteredItems()
     }
 
     private fun parseTagsFromCache(json: String): List<String> {
@@ -315,19 +343,16 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
                 hasMore = true
             )
         }
-        exposedItems.clear()
         startFeedLoad(clearExisting = true, showInitialLoading = true)
     }
 
     fun setPlayingItemId(id: String?) {
-        val previousId = _playingItemId.value
         _playingItemId.value = id
-        if (id != null && id != previousId) {
-            allItems = allItems.map { item ->
-                if (item.id == id) item.copy(playCount = item.playCount + 1) else item
-            }
-            incrementAnalytics(id, AnalyticsEvent.PLAY)
-        }
+    }
+
+    fun recordPlaybackStarted(itemId: String) {
+        if (!playedItems.add(itemId)) return
+        recordAnalyticsEvent(itemId, AnalyticsEventType.PLAY)
     }
 
     fun toggleLike(itemId: String) {
@@ -354,6 +379,9 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
             if (tokenManager.isMockMode()) {
                 allItems.firstOrNull { it.id == itemId }?.let {
                     saveAndPublishInteraction(it)
+                    if (it.isLiked) {
+                        recordAnalyticsEvent(itemId, AnalyticsEventType.LIKE)
+                    }
                 }
                 return@launch
             }
@@ -362,6 +390,9 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
                 onSuccess = { interaction ->
                     applyInteraction(itemId, interaction)
                     saveAndPublishInteraction(itemId, interaction)
+                    if (interaction.isLiked) {
+                        recordAnalyticsEvent(itemId, AnalyticsEventType.LIKE)
+                    }
                 },
                 onFailure = {
                     allItems = snapshot
@@ -395,6 +426,9 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
             if (tokenManager.isMockMode()) {
                 allItems.firstOrNull { it.id == itemId }?.let {
                     saveAndPublishInteraction(it)
+                    if (it.isCollected) {
+                        recordAnalyticsEvent(itemId, AnalyticsEventType.COLLECT)
+                    }
                 }
                 return@launch
             }
@@ -403,6 +437,9 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
                 onSuccess = { interaction ->
                     applyInteraction(itemId, interaction)
                     saveAndPublishInteraction(itemId, interaction)
+                    if (interaction.isCollected) {
+                        recordAnalyticsEvent(itemId, AnalyticsEventType.COLLECT)
+                    }
                 },
                 onFailure = {
                     allItems = snapshot
@@ -427,6 +464,7 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
         }
         updateFilteredItems()
         incrementAnalytics(itemId, AnalyticsEvent.SHARE)
+        recordAnalyticsEvent(itemId, AnalyticsEventType.SHARE)
     }
 
     fun filterByTag(tag: String) {
@@ -458,6 +496,7 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
             } else item
         }
         incrementAnalytics(itemId, AnalyticsEvent.EXPOSURE)
+        recordAnalyticsEvent(itemId, AnalyticsEventType.EXPOSURE)
     }
 
     fun recordClick(itemId: String) {
@@ -468,6 +507,7 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
             } else item
         }
         incrementAnalytics(itemId, AnalyticsEvent.CLICK)
+        recordAnalyticsEvent(itemId, AnalyticsEventType.CLICK)
 
         viewModelScope.launch {
             allItems.firstOrNull { it.id == itemId }?.let {
@@ -507,26 +547,8 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
             .map { it.first }
     }
 
-    fun getStats(): com.ico.nekofeed.ui.stats.StatsData {
-        val totalExposure = allItems.sumOf { it.exposureCount }
-        val totalClick = allItems.sumOf { it.clickCount }
-        val totalLike = allItems.sumOf { it.likeCount }
-        val totalCollect = allItems.sumOf { it.collectCount }
-        val totalShare = allItems.sumOf { it.shareCount }
-        val totalPlay = allItems.sumOf { it.playCount }
-        val ctr = if (totalExposure > 0) totalClick.toFloat() / totalExposure else 0f
-        val topItems = allItems.sortedByDescending { it.exposureCount }.take(10)
-
-        return com.ico.nekofeed.ui.stats.StatsData(
-            totalExposure = totalExposure,
-            totalClick = totalClick,
-            totalLike = totalLike,
-            totalCollect = totalCollect,
-            totalShare = totalShare,
-            totalPlay = totalPlay,
-            ctr = ctr,
-            topItems = topItems
-        )
+    fun selectStatsRange(range: StatsRange) {
+        _statsRange.value = range
     }
 
     private fun filterByCategory(items: List<FeedItem>, category: FeedCategory): List<FeedItem> {
@@ -568,6 +590,14 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
 
     private suspend fun mergeLocalState(items: List<FeedItem>): List<FeedItem> {
         val analytics = analyticsDao.getAll().associateBy { it.itemId }
+        val aiCaches = if (items.isEmpty()) {
+            emptyMap()
+        } else {
+            database.aiCacheDao()
+                .getCaches(items.map { it.id })
+                .filterNot { it.modelUsed.endsWith("-fallback") }
+                .associateBy { it.itemId }
+        }
         val interactions = if (tokenManager.isMockMode()) {
             interactionDao.getAllInteractions().associateBy { it.itemId }
         } else {
@@ -577,6 +607,7 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
         return items.map { item ->
             val localAnalytics = analytics[item.id]
             val localInteraction = interactions[item.id]
+            val aiCache = aiCaches[item.id]
             item.copy(
                 isLiked = localInteraction?.isLiked ?: item.isLiked,
                 isCollected = localInteraction?.isCollected ?: item.isCollected,
@@ -585,7 +616,12 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
                 exposureCount = item.exposureCount + (localAnalytics?.exposureCount ?: 0),
                 clickCount = item.clickCount + (localAnalytics?.clickCount ?: 0),
                 shareCount = item.shareCount + (localAnalytics?.shareCount ?: 0),
-                playCount = item.playCount + (localAnalytics?.playCount ?: 0)
+                playCount = item.playCount + (localAnalytics?.playCount ?: 0),
+                aiSummary = aiCache?.aiSummary?.takeIf { it.isNotBlank() } ?: item.aiSummary,
+                aiTags = aiCache?.let { parseTagsFromCache(it.aiTags) }
+                    ?.takeIf { it.isNotEmpty() }
+                    ?: item.aiTags,
+                aiReason = aiCache?.aiReason?.takeIf { it.isNotBlank() } ?: item.aiReason
             )
         }
     }
@@ -662,6 +698,25 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
                 AnalyticsEvent.SHARE -> analyticsDao.incrementShare(itemId)
                 AnalyticsEvent.PLAY -> analyticsDao.incrementPlay(itemId)
             }
+        }
+    }
+
+    private fun recordAnalyticsEvent(itemId: String, eventType: String) {
+        val item = getItemById(itemId) ?: return
+        viewModelScope.launch {
+            analyticsDao.insertEvent(
+                AnalyticsEventEntity(
+                    itemId = item.id,
+                    eventType = eventType,
+                    timestamp = System.currentTimeMillis(),
+                    sessionId = analyticsSessionId,
+                    environment = analyticsEnvironment.value,
+                    title = item.title,
+                    imageUrl = item.imageUrl,
+                    category = item.category,
+                    itemType = item.itemType
+                )
+            )
         }
     }
 

@@ -28,7 +28,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -58,6 +57,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
 import com.ico.nekofeed.data.model.FeedItem
+import com.ico.nekofeed.ui.components.SparklesIcon
 import com.ico.nekofeed.ui.feed.components.FeedItemCard
 import com.ico.nekofeed.ui.feed.components.FeedTagChip
 
@@ -105,12 +105,7 @@ fun SearchScreen(
                 Row(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.Star,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp)
-                    )
+                    SparklesIcon(size = 14.dp)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = "AI 对话搜索",
@@ -307,12 +302,7 @@ private fun SuggestionChip(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Icon(
-                imageVector = Icons.Filled.Star,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(12.dp)
-            )
+            SparklesIcon(size = 10.dp)
             Text(
                 text = text,
                 style = MaterialTheme.typography.bodySmall,
@@ -339,12 +329,7 @@ private fun AIThinkingState() {
                 .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = Icons.Filled.Star,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(24.dp)
-            )
+            SparklesIcon(size = 20.dp)
         }
         Text(
             text = "AI 正在理解你的需求...",
@@ -404,12 +389,7 @@ private fun SearchResultContent(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(bottom = 12.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.Star,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(16.dp)
-                        )
+                        SparklesIcon(size = 12.dp)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "AI 理解结果",

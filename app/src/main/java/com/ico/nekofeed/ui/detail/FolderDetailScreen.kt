@@ -46,6 +46,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.activity.compose.BackHandler
@@ -178,7 +179,11 @@ fun FeedDetailScreen(
                         onFullscreenToggle = { isFullscreen = it }
                     )
                     if (!isFullscreen) {
-                        ContentSection(item, isAiEnabled)
+                        ContentSection(
+                            item = item,
+                            isAiEnabled = isAiEnabled,
+                            onAiRetry = { onAiRequest?.invoke(item) }
+                        )
                     }
                 }
             }
@@ -312,7 +317,14 @@ private fun HeroMediaSection(
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun ContentSection(item: FeedItem, isAiEnabled: Boolean) {
+private fun ContentSection(
+    item: FeedItem,
+    isAiEnabled: Boolean,
+    onAiRetry: () -> Unit
+) {
+    val contentText = item.content?.takeIf { it.isNotBlank() }
+    val detailText = contentText ?: item.summary?.takeIf { it.isNotBlank() }
+
     Column(
         modifier = Modifier.padding(20.dp)
     ) {
@@ -437,7 +449,7 @@ private fun ContentSection(item: FeedItem, isAiEnabled: Boolean) {
                         }
                     }
                 }
-            } else if (isAiEnabled && (isLoading || item.aiSummary == null)) {
+            } else if (isAiEnabled && isLoading) {
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -501,24 +513,54 @@ private fun ContentSection(item: FeedItem, isAiEnabled: Boolean) {
                         }
                     }
                 }
+            } else if (isAiEnabled && item.isAiFailed) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 20.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f)
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 18.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "AI 智能总结生成失败",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        TextButton(onClick = onAiRetry) {
+                            Text("重试")
+                        }
+                    }
+                }
             }
         }
 
         // 产品介绍
-        if (item.content != null || item.summary != null) {
+        if (detailText != null) {
+            if (contentText != null) {
+                Text(
+                    text = when {
+                        item.itemType == "product" -> "产品介绍"
+                        item.isVideo -> "视频介绍"
+                        item.isAd -> "广告详情"
+                        else -> "正文"
+                    },
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+            }
             Text(
-                text = when {
-                    item.itemType == "product" -> "产品介绍"
-                    item.isVideo -> "视频介绍"
-                    item.isAd -> "广告详情"
-                    else -> "正文"
-                },
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
-            Text(
-                text = item.content ?: item.summary ?: "",
+                text = detailText,
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 lineHeight = MaterialTheme.typography.bodyLarge.lineHeight

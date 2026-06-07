@@ -1,5 +1,6 @@
 package com.ico.nekofeed.ui.feed.components
 
+import android.annotation.SuppressLint
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -55,11 +56,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.ico.nekofeed.data.model.FeedItem
+import com.ico.nekofeed.ui.components.SparklesIcon
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LinearWavyProgressIndicator
 import com.ico.nekofeed.player.PlayerManager
 import com.ico.nekofeed.player.VideoPlaybackStatus
 
+@SuppressLint("UnsafeOptInUsageError")
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun VideoFeedCard(
@@ -70,6 +73,7 @@ fun VideoFeedCard(
     onTagClick: ((String) -> Unit)? = null,
     isAiEnabled: Boolean = true,
     isPlaying: Boolean = false,
+    onPlaybackStarted: (String) -> Unit = {},
     onMuteToggle: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -83,6 +87,14 @@ fun VideoFeedCard(
         isPlaying && ownPlaybackState?.status == VideoPlaybackStatus.ERROR
     val isActuallyPlaying =
         isPlaying && ownPlaybackState?.status == VideoPlaybackStatus.PLAYING
+    var playbackReported by remember(item.id) { mutableStateOf(false) }
+
+    LaunchedEffect(isActuallyPlaying) {
+        if (isActuallyPlaying && !playbackReported) {
+            playbackReported = true
+            onPlaybackStarted(item.id)
+        }
+    }
 
     LaunchedEffect(isPlaying, item.mediaUrl, isInspectionMode) {
         if (isPlaying && !isInspectionMode) {
@@ -302,9 +314,8 @@ fun VideoFeedCard(
                                 .padding(10.dp, 12.dp),
                             verticalAlignment = Alignment.Top
                         ) {
-                            Text(
-                                text = "✨",
-                                style = MaterialTheme.typography.bodySmall,
+                            SparklesIcon(
+                                size = 14.dp,
                                 modifier = Modifier.padding(end = 8.dp)
                             )
                             Text(
@@ -346,10 +357,7 @@ fun VideoFeedCard(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.padding(bottom = 8.dp)
                         ) {
-                            Text(
-                                text = "✨",
-                                style = MaterialTheme.typography.bodySmall
-                            )
+                            SparklesIcon(size = 14.dp)
                             Text(
                                 text = "AI 正在生成视频看点摘要...",
                                 style = MaterialTheme.typography.labelSmall,

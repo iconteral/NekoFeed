@@ -38,6 +38,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.ico.nekofeed.data.model.FeedItem
+import com.ico.nekofeed.ui.components.SparklesIcon
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.ui.tooling.preview.Preview
@@ -94,9 +95,8 @@ fun SmallImageFeedCard(
                             )
                             .padding(4.dp, 6.dp),
                         ) {
-                            Text(
-                                text = "✨",
-                                style = MaterialTheme.typography.labelSmall,
+                            SparklesIcon(
+                                size = 12.dp,
                                 modifier = Modifier.padding(end = 4.dp)
                             )
                             Text(
@@ -143,10 +143,7 @@ fun SmallImageFeedCard(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                             modifier = Modifier.padding(bottom = 6.dp)
                         ) {
-                            Text(
-                                text = "✨",
-                                style = MaterialTheme.typography.labelSmall
-                            )
+                            SparklesIcon(size = 12.dp)
                             Text(
                                 text = "AI 正在分析文章...",
                                 style = MaterialTheme.typography.labelSmall,

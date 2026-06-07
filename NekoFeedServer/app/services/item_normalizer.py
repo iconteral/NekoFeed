@@ -18,6 +18,11 @@ def extract_image_from_html(html_content: str) -> str | None:
         pass
     return None
 
+def html_to_text(value: str) -> str:
+    if not value:
+        return ''
+    return BeautifulSoup(value, 'html.parser').get_text(' ', strip=True)
+
 def normalize_feed_item(entry, feed_id: int, feed_name: str, feed_category: str) -> dict:
     link = entry.get('link', '')
     if not link:
@@ -71,11 +76,13 @@ def normalize_feed_item(entry, feed_id: int, feed_name: str, feed_category: str)
         except Exception:
             pass
 
-    # Basic cleanup
-    if summary:
-        summary = BeautifulSoup(summary, "html.parser").get_text()[:500]
-    else:
-        summary = title
+    # Feed providers commonly put the article excerpt in summary/description and
+    # omit content:encoded entirely. Keep both fields readable and ensure detail
+    # screens always have useful text to display.
+    summary = html_to_text(summary)[:500] if summary else title
+    content_val = html_to_text(content_val)
+    if not content_val:
+        content_val = summary
 
     # Attempt to extract video URL
     media_url = None

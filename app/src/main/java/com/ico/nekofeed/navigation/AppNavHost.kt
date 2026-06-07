@@ -3,15 +3,12 @@ package com.ico.nekofeed.navigation
 import android.net.Uri
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.WindowInsets
@@ -200,20 +197,7 @@ private fun MainScreen(
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
-            AnimatedVisibility(
-                visible = showBottomBar,
-                enter = fadeIn() + slideInVertically(
-                    initialOffsetY = { it / 2 },
-                    animationSpec = spring(
-                        dampingRatio = 0.82f,
-                        stiffness = Spring.StiffnessMediumLow
-                    )
-                ),
-                exit = fadeOut() + slideOutVertically(
-                    targetOffsetY = { it / 2 },
-                    animationSpec = spring(stiffness = Spring.StiffnessMedium)
-                )
-            ) {
+            if (showBottomBar) {
                 NekoFeedBottomNavigationBar(
                     currentRoute = currentRoute,
                     onNavigate = { route ->
@@ -301,9 +285,13 @@ private fun MainScreen(
             }
 
             composable("stats") {
+                val stats by feedViewModel.stats.collectAsState()
+                val statsRange by feedViewModel.statsRange.collectAsState()
                 StatsScreen(
                     onBack = { nestedNavController.popBackStack() },
-                    stats = feedViewModel.getStats(),
+                    stats = stats,
+                    selectedRange = statsRange,
+                    onRangeSelected = feedViewModel::selectStatsRange,
                     onItemClick = openDetail
                 )
             }

@@ -3,12 +3,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 import os
 
-from app.database import engine, Base, SessionLocal
+from app.database import engine, Base, SessionLocal, ensure_feed_metric_columns
 from app.routers import api, admin, user, user_interaction
 from app.services.category_normalizer import migrate_categories
 
 # Create tables
 Base.metadata.create_all(bind=engine)
+ensure_feed_metric_columns()
 with SessionLocal() as db:
     migrate_categories(db)
 

@@ -10,6 +10,9 @@ interface AiCacheDao {
     @Query("SELECT * FROM ai_cache WHERE itemId = :itemId")
     suspend fun getCache(itemId: String): AiCacheEntity?
 
+    @Query("SELECT * FROM ai_cache WHERE itemId IN (:itemIds)")
+    suspend fun getCaches(itemIds: List<String>): List<AiCacheEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCache(entity: AiCacheEntity)
 
@@ -21,4 +24,7 @@ interface AiCacheDao {
 
     @Query("DELETE FROM ai_cache")
     suspend fun clearAll()
+
+    @Query("DELETE FROM ai_cache WHERE itemId = :itemId")
+    suspend fun deleteCache(itemId: String)
 }

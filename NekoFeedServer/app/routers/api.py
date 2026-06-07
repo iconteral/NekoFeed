@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import Optional
 from app.database import get_db
-from app.models import UpstreamFeed, FeedItem, UserLike, UserCollect, User
+from app.models import UpstreamFeed, FeedItem, UserLike, UserCollect, UserHistory, User
 from app.schemas import FeedResponse
 from app.auth import get_or_create_device_user
 from app.services.feed_fetcher import fetch_and_process_feed
@@ -41,6 +41,7 @@ def get_feed(
     
     like_counts = {}
     collect_counts = {}
+    click_counts = {}
     user_likes = set()
     user_collects = set()
     
@@ -55,6 +56,11 @@ def get_feed(
             UserCollect.item_id.in_(item_ids)
         ).group_by(UserCollect.item_id).all():
             collect_counts[item_id] = cnt
+
+        for item_id, cnt in db.query(UserHistory.item_id, func.count()).filter(
+            UserHistory.item_id.in_(item_ids)
+        ).group_by(UserHistory.item_id).all():
+            click_counts[item_id] = cnt
         
         # 当前用户的互动
         if current_user:
@@ -92,8 +98,9 @@ def get_feed(
              # 互动状态
              "is_liked": item.id in user_likes,
              "is_collected": item.id in user_collects,
-             "like_count": like_counts.get(item.id, 0),
-             "collect_count": collect_counts.get(item.id, 0),
+             "like_count": item.base_like_count + like_counts.get(item.id, 0),
+             "collect_count": item.base_collect_count + collect_counts.get(item.id, 0),
+             "click_count": item.base_click_count + click_counts.get(item.id, 0),
              "share_count": 0,
         }
         

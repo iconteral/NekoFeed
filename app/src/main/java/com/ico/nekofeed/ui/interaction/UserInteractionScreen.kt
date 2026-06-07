@@ -3,6 +3,7 @@ package com.ico.nekofeed.ui.interaction
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -216,7 +217,14 @@ fun UserInteractionScreen(
                                 onClick = { onItemClick(item.id) },
                                 onLikeClick = { viewModel.toggleLike(it) },
                                 onCollectClick = { viewModel.toggleCollect(it) },
-                                modifier = Modifier.animateItem()
+                                modifier = Modifier.animateItem(
+                                    fadeInSpec = tween(durationMillis = 180),
+                                    placementSpec = spring(
+                                        dampingRatio = Spring.DampingRatioNoBouncy,
+                                        stiffness = Spring.StiffnessMediumLow
+                                    ),
+                                    fadeOutSpec = tween(durationMillis = 220)
+                                )
                             )
                         }
 

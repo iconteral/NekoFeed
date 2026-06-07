@@ -1,12 +1,34 @@
 package com.ico.nekofeed.data.local.db
 
 import androidx.room.Dao
+import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface FeedAnalyticsDao {
+    @Insert
+    suspend fun insertEvent(event: AnalyticsEventEntity)
+
+    @Insert
+    suspend fun insertEvents(events: List<AnalyticsEventEntity>)
+
+    @Query(
+        """
+        SELECT * FROM analytics_events
+        WHERE environment = :environment AND timestamp >= :since
+        ORDER BY timestamp DESC
+        """
+    )
+    fun observeEventsSince(
+        since: Long,
+        environment: String
+    ): Flow<List<AnalyticsEventEntity>>
+
+    @Query("SELECT COUNT(*) FROM analytics_events WHERE sessionId = :sessionId")
+    suspend fun countEventsForSession(sessionId: String): Int
+
     @Query("SELECT * FROM feed_analytics")
     fun observeAll(): Flow<List<FeedAnalyticsEntity>>
 
