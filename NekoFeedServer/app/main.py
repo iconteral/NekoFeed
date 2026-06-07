@@ -3,11 +3,14 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 import os
 
-from app.database import engine, Base
+from app.database import engine, Base, SessionLocal
 from app.routers import api, admin, user, user_interaction
+from app.services.category_normalizer import migrate_categories
 
 # Create tables
 Base.metadata.create_all(bind=engine)
+with SessionLocal() as db:
+    migrate_categories(db)
 
 app = FastAPI(title="Local Feed Aggregator")
 

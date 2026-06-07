@@ -99,12 +99,10 @@ private val FeedCategories = listOf(
     FeedCategory.SHOPPING,
     FeedCategory.LOCAL,
     FeedCategory.VIDEO,
-    FeedCategory.TECH,
-    FeedCategory.AI
+    FeedCategory.TECH
 )
 
 private enum class FeedBodyState {
-    LOADING,
     ERROR,
     CONTENT
 }
@@ -312,56 +310,58 @@ fun FeedScreenContent(
                 },
                 modifier = Modifier.fillMaxSize()
             ) {
-                val bodyState = when {
-                    pageCategory != uiState.selectedCategory || uiState.isLoading ->
-                        FeedBodyState.LOADING
-                    uiState.errorMessage != null && uiState.items.isEmpty() ->
-                        FeedBodyState.ERROR
-                    else -> FeedBodyState.CONTENT
-                }
-                AnimatedContent(
-                    targetState = bodyState,
-                    transitionSpec = {
-                        (fadeIn() + scaleIn(
-                            initialScale = 0.975f,
-                            animationSpec = spring(
-                                dampingRatio = 0.84f,
-                                stiffness = Spring.StiffnessMediumLow
-                            )
-                        )) togetherWith
-                            (fadeOut() + scaleOut(targetScale = 0.99f))
-                    },
-                    label = "feed_body_state"
-                ) { state ->
-                    when (state) {
-                        FeedBodyState.LOADING -> {
-                        FeedLoadingContent()
+                val isPageLoading =
+                    pageCategory != uiState.selectedCategory || uiState.isLoading
+                if (isPageLoading) {
+                    FeedLoadingContent()
+                } else {
+                    val bodyState =
+                        if (uiState.errorMessage != null && uiState.items.isEmpty()) {
+                            FeedBodyState.ERROR
+                        } else {
+                            FeedBodyState.CONTENT
                         }
-                        FeedBodyState.ERROR -> {
-                            ErrorContent(
-                                message = uiState.errorMessage.orEmpty(),
-                                onRetry = onRetry
-                            )
-                        }
-                        FeedBodyState.CONTENT -> {
-                            FeedContent(
-                                items = uiState.items,
-                                usingFallback = uiState.usingFallback,
-                                isLoadingMore = uiState.isLoadingMore,
-                                hasMore = uiState.hasMore,
-                                listState = listState,
-                                isAiEnabled = uiState.isAiEnabled,
-                                playingItemId = playingItemId,
-                                onItemClick = onItemClick,
-                                onLoadMore = onLoadMore,
-                                onLikeClick = onLikeClick,
-                                onCollectClick = onCollectClick,
-                                onShareClick = onShareClick,
-                                onTagClick = onTagClick,
-                                onAiRequest = onAiRequest,
-                                onExposure = onExposure,
-                                onPlayingItemChange = onPlayingItemChange
-                            )
+                    AnimatedContent(
+                        targetState = bodyState,
+                        transitionSpec = {
+                            (fadeIn() + scaleIn(
+                                initialScale = 0.975f,
+                                animationSpec = spring(
+                                    dampingRatio = 0.84f,
+                                    stiffness = Spring.StiffnessMediumLow
+                                )
+                            )) togetherWith
+                                (fadeOut() + scaleOut(targetScale = 0.99f))
+                        },
+                        label = "feed_body_state"
+                    ) { state ->
+                        when (state) {
+                            FeedBodyState.ERROR -> {
+                                ErrorContent(
+                                    message = uiState.errorMessage.orEmpty(),
+                                    onRetry = onRetry
+                                )
+                            }
+                            FeedBodyState.CONTENT -> {
+                                FeedContent(
+                                    items = uiState.items,
+                                    usingFallback = uiState.usingFallback,
+                                    isLoadingMore = uiState.isLoadingMore,
+                                    hasMore = uiState.hasMore,
+                                    listState = listState,
+                                    isAiEnabled = uiState.isAiEnabled,
+                                    playingItemId = playingItemId,
+                                    onItemClick = onItemClick,
+                                    onLoadMore = onLoadMore,
+                                    onLikeClick = onLikeClick,
+                                    onCollectClick = onCollectClick,
+                                    onShareClick = onShareClick,
+                                    onTagClick = onTagClick,
+                                    onAiRequest = onAiRequest,
+                                    onExposure = onExposure,
+                                    onPlayingItemChange = onPlayingItemChange
+                                )
+                            }
                         }
                     }
                 }
@@ -397,6 +397,10 @@ private fun FeedTagFilter(
     onTagClick: (String) -> Unit,
     onClearTags: () -> Unit
 ) {
+    val orderedTags =
+        selectedTags.filter { it in availableTags } +
+            availableTags.filterNot { it in selectedTags }
+
     AnimatedVisibility(
         visible = availableTags.isNotEmpty(),
         enter = fadeIn() + scaleIn(
@@ -442,7 +446,7 @@ private fun FeedTagFilter(
                 }
             }
 
-            items(availableTags, key = { "tag-$it" }) { tag ->
+            items(orderedTags, key = { "tag-$it" }) { tag ->
                 FeedTagChip(
                     tag = tag,
                     onClick = { onTagClick(tag) },

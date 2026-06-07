@@ -4,6 +4,7 @@ import time
 from datetime import datetime
 from dateutil import parser as date_parser
 from bs4 import BeautifulSoup
+from app.services.category_normalizer import normalize_category
 
 def extract_image_from_html(html_content: str) -> str | None:
     if not html_content:
@@ -106,7 +107,7 @@ def normalize_feed_item(entry, feed_id: int, feed_name: str, feed_category: str)
         'content': content_val,
         'source_name': feed_name,
         'source_url': link,
-        'category': feed_category,
+        'category': normalize_category(feed_category),
         'item_type': item_type,
         'card_type': card_type,
         'image_url': image_url,

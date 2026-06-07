@@ -100,21 +100,23 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
 
             val category = _uiState.value.selectedCategory
             val categoryParam = if (category == FeedCategory.FEATURED) null else category.value
+            val isMockMode = tokenManager.isMockMode()
 
             repository.loadFeed(category = categoryParam, limit = pageSize, offset = 0).fold(
                 onSuccess = { items ->
                     val mergedItems = mergeLocalState(items)
+                    val visibleItems = filterByCategory(mergedItems, category)
                     allItems = mergedItems
                     currentOffset = mergedItems.size
                     _uiState.update {
                         it.copy(
                             isLoading = false,
                             isRefreshing = false,
-                            items = mergedItems,
-                            availableTags = collectAvailableTags(mergedItems),
+                            items = visibleItems,
+                            availableTags = collectAvailableTags(visibleItems),
                             errorMessage = null,
                             usingFallback = false,
-                            hasMore = mergedItems.size >= pageSize
+                            hasMore = !isMockMode && mergedItems.size >= pageSize
                         )
                     }
                     batchGenerateAi(mergedItems)
@@ -303,8 +305,14 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update {
             it.copy(
                 selectedCategory = category,
+                isLoading = true,
+                isRefreshing = false,
+                items = emptyList(),
                 selectedTags = emptyList(),
-                availableTags = emptyList()
+                availableTags = emptyList(),
+                errorMessage = null,
+                usingFallback = false,
+                hasMore = true
             )
         }
         exposedItems.clear()
@@ -426,7 +434,7 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
         if (currentTags.contains(tag)) {
             currentTags.remove(tag)
         } else {
-            currentTags.add(tag)
+            currentTags.add(0, tag)
         }
         _uiState.update { it.copy(selectedTags = currentTags) }
         updateFilteredItems()

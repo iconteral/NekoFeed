@@ -54,9 +54,7 @@
                     <label>Category</label>
                     <select name="category">
                         <option value="tech" {% if item.category == 'tech' %}selected{% endif %}>Tech</option>
-                        <option value="ai" {% if item.category == 'ai' %}selected{% endif %}>AI</option>
                         <option value="news" {% if item.category == 'news' %}selected{% endif %}>News</option>
-                        <option value="featured" {% if item.category == 'featured' %}selected{% endif %}>Featured</option>
                         <option value="ad" {% if item.category == 'ad' %}selected{% endif %}>Ad</option>
                         <option value="local" {% if item.category == 'local' %}selected{% endif %}>Local</option>
                     </select>

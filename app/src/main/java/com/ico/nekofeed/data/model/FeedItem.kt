@@ -133,8 +133,6 @@ enum class FeedItemType(val value: String) {
 enum class FeedCategory(val value: String, val displayName: String) {
     FEATURED("featured", "精选"),
     TECH("tech", "科技"),
-    AI("ai", "AI"),
-    BUSINESS("business", "商业"),
     LOCAL("local", "本地"),
     VIDEO("video", "视频"),
     SHOPPING("shopping", "电商");

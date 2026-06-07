@@ -5,6 +5,7 @@ import asyncio
 import traceback
 from sqlalchemy.orm import Session
 from app.models import FeedItem
+from app.services.category_normalizer import normalize_category, normalize_item_category
 from app.services.llm_config import LlmConfig
 
 logger = logging.getLogger(__name__)
@@ -258,13 +259,18 @@ async def enrich_items(db_session_factory, item_ids: list[str], config: LlmConfi
                         item.card_type = "text_only"
                         
                     if "category" in result and result["category"]:
-                        item.category = result["category"]
+                        item.category = normalize_category(result["category"], default=item.category)
                     
                     # Update AI fields (tags, summary, reason are generated on client side instead)
                     item.brand = result.get("brand") or item.brand
                     item.cta_text = result.get("cta_text") or item.cta_text
                     item.price_text = result.get("price_text") or item.price_text
                     item.is_sponsored = result.get("is_sponsored", False) or item.is_sponsored
+                    item.category = normalize_item_category(
+                        item.category,
+                        item.item_type,
+                        bool(item.is_custom or item.is_sponsored),
+                    )
                     
                     item.ai_enriched = True
                     db.commit()

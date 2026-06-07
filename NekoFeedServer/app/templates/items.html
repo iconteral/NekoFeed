@@ -16,10 +16,9 @@
         <select name="category">
             <option value="">All Categories</option>
             <option value="tech" {% if category == 'tech' %}selected{% endif %}>Tech</option>
-            <option value="ai" {% if category == 'ai' %}selected{% endif %}>AI</option>
             <option value="news" {% if category == 'news' %}selected{% endif %}>News</option>
-            <option value="featured" {% if category == 'featured' %}selected{% endif %}>Featured</option>
             <option value="ad" {% if category == 'ad' %}selected{% endif %}>Ads</option>
+            <option value="local" {% if category == 'local' %}selected{% endif %}>Local</option>
         </select>
         <select name="item_type">
             <option value="">All Types</option>

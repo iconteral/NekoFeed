@@ -8,6 +8,13 @@ logger = logging.getLogger(__name__)
 MEDIA_DIR = "data/media"
 IMAGE_DIR = os.path.join(MEDIA_DIR, "images")
 VIDEO_DIR = os.path.join(MEDIA_DIR, "videos")
+MEDIA_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/125.0 Mobile Safari/537.36"
+    ),
+    "Accept": "video/*,image/*,*/*;q=0.8",
+}
 
 async def download_media(url: str, is_video: bool = False) -> str | None:
     """Downloads a media file and returns the local relative path."""
@@ -33,8 +40,13 @@ async def download_media(url: str, is_video: bool = False) -> str | None:
         if os.path.exists(filepath):
             return rel_path # Already downloaded
             
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(url, follow_redirects=True)
+        timeout = httpx.Timeout(60.0 if is_video else 20.0)
+        async with httpx.AsyncClient(timeout=timeout, headers=MEDIA_HEADERS) as client:
+            response = await client.get(
+                url,
+                follow_redirects=True,
+                headers={"Referer": url},
+            )
             response.raise_for_status()
             with open(filepath, 'wb') as f:
                 f.write(response.content)

@@ -81,8 +81,8 @@ fun VideoFeedCard(
     val ownPlaybackState = playbackState.takeIf { it.ownerId == item.id }
     val hasPlaybackError =
         isPlaying && ownPlaybackState?.status == VideoPlaybackStatus.ERROR
-    val isBuffering =
-        isPlaying && ownPlaybackState?.status == VideoPlaybackStatus.BUFFERING
+    val isActuallyPlaying =
+        isPlaying && ownPlaybackState?.status == VideoPlaybackStatus.PLAYING
 
     LaunchedEffect(isPlaying, item.mediaUrl, isInspectionMode) {
         if (isPlaying && !isInspectionMode) {
@@ -124,18 +124,6 @@ fun VideoFeedCard(
                     },
                     modifier = Modifier.fillMaxWidth().height(260.dp)
                 )
-
-                if (isBuffering) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(260.dp)
-                            .background(Color.Black.copy(alpha = 0.24f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(color = Color.White)
-                    }
-                }
 
                 // 静音控制按钮
                 Box(
@@ -247,33 +235,35 @@ fun VideoFeedCard(
             }
 
             // 播放状态标签
-            Box(
-                modifier = Modifier
-                    .padding(12.dp)
-                    .align(Alignment.BottomStart)
-                    .background(
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
-                        RoundedCornerShape(20.dp)
-                    )
-                    .padding(horizontal = 10.dp, vertical = 4.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+            if (isActuallyPlaying) {
+                Box(
+                    modifier = Modifier
+                        .padding(12.dp)
+                        .align(Alignment.BottomStart)
+                        .background(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
+                            RoundedCornerShape(20.dp)
+                        )
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.PlayArrow,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(12.dp)
-                    )
-                    Text(
-                        text = "播放中",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.PlayArrow,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Text(
+                            text = "播放中",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
             }
         }

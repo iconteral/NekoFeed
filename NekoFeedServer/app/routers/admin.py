@@ -6,6 +6,7 @@ from sqlalchemy import and_, or_
 from app.database import get_db
 from app.models import UpstreamFeed, FeedItem, User, UserLike, UserCollect, UserHistory
 from app.schemas import UpstreamFeedCreate
+from app.services.category_normalizer import normalize_category
 import hashlib
 import time
 from datetime import datetime
@@ -70,7 +71,7 @@ def admin_feeds(request: Request, db: Session = Depends(get_db)):
 
 @router.post("/feeds")
 def add_feed(name: str = Form(...), url: str = Form(...), category: str = Form("tech"), db: Session = Depends(get_db)):
-    new_feed = UpstreamFeed(name=name, url=url, category=category)
+    new_feed = UpstreamFeed(name=name, url=url, category=normalize_category(category))
     db.add(new_feed)
     try:
         db.commit()
@@ -137,7 +138,7 @@ def import_feeds(
     for i, entry in enumerate(feeds):
         name = entry.get("name", "").strip()
         url = entry.get("url", "").strip()
-        category = entry.get("category", "tech").strip()
+        category = normalize_category(entry.get("category"))
         enabled = entry.get("enabled", True)
 
         if not name or not url:
@@ -221,7 +222,7 @@ def add_custom_item(
         title=title,
         summary=summary,
         content=content,
-        category=category,
+        category=normalize_category(category),
         item_type=item_type,
         card_type=card_type,
         image_url=resolved_image_url,
@@ -300,7 +301,7 @@ def update_item(
     item.content = content or None
     item.source_name = source_name or None
     item.source_url = source_url or None
-    item.category = category
+    item.category = normalize_category(category)
     item.item_type = item_type
     item.card_type = card_type
     item.tags = tags or None

@@ -8,6 +8,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
 import androidx.media3.datasource.cache.SimpleCache
@@ -22,6 +23,7 @@ enum class VideoPlaybackStatus {
     IDLE,
     BUFFERING,
     READY,
+    PLAYING,
     ERROR
 }
 
@@ -35,6 +37,10 @@ data class VideoPlaybackState(
 class PlayerManager private constructor(private val context: Context) {
 
     companion object {
+        private const val BROWSER_USER_AGENT =
+            "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 " +
+                "(KHTML, like Gecko) Chrome/125.0 Mobile Safari/537.36"
+
         @Volatile
         private var instance: PlayerManager? = null
 
@@ -66,10 +72,11 @@ class PlayerManager private constructor(private val context: Context) {
         private set
 
     private val playerListener = object : Player.Listener {
-        override fun onPlaybackStateChanged(playbackState: Int) {
-            val status = when (playbackState) {
-                Player.STATE_BUFFERING -> VideoPlaybackStatus.BUFFERING
-                Player.STATE_READY -> VideoPlaybackStatus.READY
+        override fun onEvents(player: Player, events: Player.Events) {
+            val status = when {
+                player.isPlaying -> VideoPlaybackStatus.PLAYING
+                player.playbackState == Player.STATE_BUFFERING -> VideoPlaybackStatus.BUFFERING
+                player.playbackState == Player.STATE_READY -> VideoPlaybackStatus.READY
                 else -> VideoPlaybackStatus.IDLE
             }
             _playbackState.value = VideoPlaybackState(
@@ -98,7 +105,18 @@ class PlayerManager private constructor(private val context: Context) {
             simpleCache = SimpleCache(cacheDir, cacheEvictor, databaseProvider)
         }
 
-        val dataSourceFactory = DefaultDataSource.Factory(context)
+        val httpDataSourceFactory = DefaultHttpDataSource.Factory()
+            .setUserAgent(BROWSER_USER_AGENT)
+            .setAllowCrossProtocolRedirects(true)
+            .setConnectTimeoutMs(15_000)
+            .setReadTimeoutMs(30_000)
+            .setDefaultRequestProperties(
+                mapOf(
+                    "Accept" to "video/*,*/*;q=0.8",
+                    "Accept-Language" to "zh-CN,zh;q=0.9,en;q=0.8"
+                )
+            )
+        val dataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
         val cacheDataSourceFactory = CacheDataSource.Factory()
             .setCache(simpleCache!!)
             .setUpstreamDataSourceFactory(dataSourceFactory)

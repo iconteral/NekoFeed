@@ -24,7 +24,11 @@ def get_feed(
     db: Session = Depends(get_db)
 ):
     query = db.query(FeedItem)
-    if category:
+    if category == "video":
+        query = query.filter(FeedItem.item_type == "video")
+    elif category == "shopping":
+        query = query.filter(FeedItem.item_type == "product")
+    elif category and category != "featured":
         query = query.filter(FeedItem.category == category)
     if item_type:
          query = query.filter(FeedItem.item_type == item_type)
