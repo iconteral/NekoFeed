@@ -94,7 +94,8 @@ fun FeedDetailScreen(
     onCollectClick: ((String) -> Unit)? = null,
     onShareClick: ((String) -> Unit)? = null,
     isAiEnabled: Boolean = true,
-    onAiRequest: ((FeedItem) -> Unit)? = null
+    onAiRequest: ((FeedItem) -> Unit)? = null,
+    onTagClick: ((String) -> Unit)? = null
 ) {
     var isFullscreen by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
@@ -178,7 +179,7 @@ fun FeedDetailScreen(
                         onFullscreenToggle = { isFullscreen = it }
                     )
                     if (!isFullscreen) {
-                        ContentSection(item, isAiEnabled)
+                        ContentSection(item, isAiEnabled, onTagClick)
                     }
                 }
             }
@@ -312,7 +313,7 @@ private fun HeroMediaSection(
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun ContentSection(item: FeedItem, isAiEnabled: Boolean) {
+private fun ContentSection(item: FeedItem, isAiEnabled: Boolean, onTagClick: ((String) -> Unit)? = null) {
     val detailText = item.content
         ?.takeIf { it.isNotBlank() }
         ?: item.summary?.takeIf { it.isNotBlank() }
@@ -434,7 +435,7 @@ private fun ContentSection(item: FeedItem, isAiEnabled: Boolean) {
                                 item.displayTags.forEach { tag ->
                                     FeedTagChip(
                                         tag = tag,
-                                        onClick = { }
+                                        onClick = { onTagClick?.invoke(tag) }
                                     )
                                 }
                             }
@@ -581,7 +582,7 @@ private fun ContentSection(item: FeedItem, isAiEnabled: Boolean) {
         if (item.publishedAt != null) {
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = "发布时间: ${item.publishedAt}",
+                text = formatPublishedTime(item.publishedAt),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -753,6 +754,29 @@ private fun openUrl(context: Context, url: String) {
         context.startActivity(intent)
     } catch (e: Exception) {
         e.printStackTrace()
+    }
+}
+
+private fun formatPublishedTime(publishedAt: String): String {
+    return try {
+        val formatter = java.time.format.DateTimeFormatter.ISO_DATE_TIME
+        val publishTime = java.time.LocalDateTime.parse(publishedAt, formatter)
+        val now = java.time.LocalDateTime.now()
+        val duration = java.time.Duration.between(publishTime, now)
+
+        when {
+            duration.isNegative -> "刚刚"
+            duration.toMinutes() < 1 -> "刚刚"
+            duration.toMinutes() < 60 -> "${duration.toMinutes()}分钟前"
+            duration.toHours() < 24 -> "${duration.toHours()}小时前"
+            duration.toDays() < 1 -> "今天"
+            duration.toDays() < 2 -> "昨天"
+            duration.toDays() < 7 -> "${duration.toDays()}天前"
+            duration.toDays() < 30 -> "${duration.toDays() / 7}周前"
+            else -> publishedAt.substringBefore("T")
+        }
+    } catch (e: Exception) {
+        publishedAt.substringBefore("T")
     }
 }
 

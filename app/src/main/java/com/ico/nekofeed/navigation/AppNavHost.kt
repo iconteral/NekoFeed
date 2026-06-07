@@ -272,7 +272,11 @@ private fun MainScreen(
                     onCollectClick = feedViewModel::toggleCollect,
                     onShareClick = { id -> feedViewModel.toggleShare(id) },
                     isAiEnabled = uiState.isAiEnabled,
-                    onAiRequest = { feedViewModel.requestAiAnalysis(it) }
+                    onAiRequest = { feedViewModel.requestAiAnalysis(it) },
+                    onTagClick = { tag ->
+                        nestedNavController.popBackStack()
+                        feedViewModel.filterByTag(tag)
+                    }
                 )
             }
 
