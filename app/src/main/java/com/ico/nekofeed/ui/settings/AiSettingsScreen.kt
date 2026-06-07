@@ -51,6 +51,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ico.nekofeed.ui.theme.ExpressiveTokens
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -210,10 +215,14 @@ fun AiSettingsScreen(
                 }
             }
 
-            if (uiState.testResult != null) {
+            AnimatedVisibility(
+                visible = uiState.testResult != null,
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(24.dp),
                     color = if (uiState.testSuccess)
                         Color(0xFF4CAF50).copy(alpha = 0.1f)
                     else
@@ -224,7 +233,7 @@ fun AiSettingsScreen(
                     )
                 ) {
                     Row(
-                        modifier = Modifier.padding(16.dp),
+                        modifier = Modifier.padding(24.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
@@ -235,7 +244,7 @@ fun AiSettingsScreen(
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
-                            text = uiState.testResult!!,
+                            text = uiState.testResult ?: "",
                             style = MaterialTheme.typography.bodyMedium,
                             color = if (uiState.testSuccess) Color(0xFF4CAF50) else MaterialTheme.colorScheme.error
                         )

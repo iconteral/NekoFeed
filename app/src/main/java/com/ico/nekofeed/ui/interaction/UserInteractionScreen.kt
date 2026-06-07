@@ -153,6 +153,7 @@ fun UserInteractionScreen(
             }
             AnimatedContent(
                 targetState = bodyState,
+                modifier = Modifier.fillMaxSize(),
                 transitionSpec = {
                     (fadeIn() + scaleIn(
                         initialScale = 0.97f,
