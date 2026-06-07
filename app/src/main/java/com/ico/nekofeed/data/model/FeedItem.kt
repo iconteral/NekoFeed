@@ -76,8 +76,7 @@ data class FeedItem(
     val publishedAt: String?,
     @SerializedName("created_at")
     val createdAt: String? = null,
-    val isAiLoading: Boolean = false,
-    val isAiFailed: Boolean = false
+    val isAiLoading: Boolean = false
 ) {
     // 便捷属性：获取显示用的摘要（优先AI摘要，其次原始摘要）
     val displaySummary: String

@@ -174,6 +174,7 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
                             hasMore = !isMockMode && mergedItems.size >= pageSize
                         )
                     }
+                    batchGenerateAi(mergedItems)
                 },
                 onFailure = { error ->
                     val fallbackItems = mergeLocalState(repository.getFallbackData())
@@ -191,6 +192,7 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
                             hasMore = false
                         )
                     }
+                    batchGenerateAi(fallbackItems)
                 }
             )
         }
@@ -227,6 +229,7 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
                                 hasMore = mergedItems.size >= pageSize
                             )
                         }
+                        batchGenerateAi(mergedItems)
                     }
                 },
                 onFailure = { error ->
@@ -258,60 +261,84 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun batchGenerateAi(items: List<FeedItem>) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isAiLoading = true) }
+            try {
+                aiRepository.batchGenerateAi(items)
+                val updatedItems = allItems.map { item ->
+                    val cached = aiRepository.getCache(item.id)
+                    if (cached != null) {
+                        item.copy(
+                            aiSummary = cached.aiSummary ?: item.aiSummary,
+                            aiTags = parseTagsFromCache(cached.aiTags),
+                            aiReason = cached.aiReason ?: item.aiReason
+                        )
+                    } else item
+                }
+                allItems = updatedItems
+                updateFilteredItems()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                _uiState.update { it.copy(isAiLoading = false) }
+            }
+        }
+    }
+
     private val aiSemaphore = Semaphore(8)
 
     fun requestAiAnalysis(item: FeedItem) {
         if (!item.aiSummary.isNullOrBlank() || item.isAiLoading) return
 
         viewModelScope.launch {
-            try {
-                val cached = aiRepository.getCache(item.id)
-                if (!cached?.aiSummary.isNullOrBlank()) {
-                    val updatedTags = parseTagsFromCache(cached!!.aiTags)
-                    updateAiItem(item.id) {
+            val cached = aiRepository.getCache(item.id)
+            if (cached != null) {
+                val updatedTags = parseTagsFromCache(cached.aiTags)
+                allItems = allItems.map { it ->
+                    if (it.id == item.id) {
                         it.copy(
                             aiSummary = cached.aiSummary,
                             aiTags = updatedTags,
                             aiReason = cached.aiReason,
-                            isAiLoading = false,
-                            isAiFailed = false
+                            isAiLoading = false
                         )
-                    }
-                    return@launch
+                    } else it
                 }
+                updateFilteredItems()
+                return@launch
+            }
 
-                val config = tokenManager.getLlmConfig()
-                if (!config.aiEnabled || config.baseUrl.isBlank()) return@launch
+            val config = tokenManager.getLlmConfig()
+            if (!config.aiEnabled || config.baseUrl.isBlank()) return@launch
 
-                updateAiItem(item.id) { it.copy(isAiLoading = true, isAiFailed = false) }
+            allItems = allItems.map { it ->
+                if (it.id == item.id) {
+                    it.copy(isAiLoading = true)
+                } else it
+            }
+            updateFilteredItems()
 
-                val result = aiSemaphore.withPermit {
-                    aiRepository.generateFeedAi(item)
-                }
+            val result = aiSemaphore.withPermit {
+                aiRepository.generateFeedAi(item)
+            }
 
-                updateAiItem(item.id) {
-                    if (!result?.aiSummary.isNullOrBlank()) {
+            allItems = allItems.map { it ->
+                if (it.id == item.id) {
+                    if (result != null) {
                         it.copy(
-                            aiSummary = result!!.aiSummary,
+                            aiSummary = result.aiSummary,
                             aiTags = result.aiTags,
                             aiReason = result.aiReason,
-                            isAiLoading = false,
-                            isAiFailed = false
+                            isAiLoading = false
                         )
                     } else {
-                        it.copy(isAiLoading = false, isAiFailed = true)
+                        it.copy(isAiLoading = false)
                     }
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                updateAiItem(item.id) { it.copy(isAiLoading = false, isAiFailed = true) }
+                } else it
             }
+            updateFilteredItems()
         }
-    }
-
-    private fun updateAiItem(itemId: String, transform: (FeedItem) -> FeedItem) {
-        allItems = allItems.map { if (it.id == itemId) transform(it) else it }
-        updateFilteredItems()
     }
 
     private fun parseTagsFromCache(json: String): List<String> {
@@ -590,14 +617,6 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
 
     private suspend fun mergeLocalState(items: List<FeedItem>): List<FeedItem> {
         val analytics = analyticsDao.getAll().associateBy { it.itemId }
-        val aiCaches = if (items.isEmpty()) {
-            emptyMap()
-        } else {
-            database.aiCacheDao()
-                .getCaches(items.map { it.id })
-                .filterNot { it.modelUsed.endsWith("-fallback") }
-                .associateBy { it.itemId }
-        }
         val interactions = if (tokenManager.isMockMode()) {
             interactionDao.getAllInteractions().associateBy { it.itemId }
         } else {
@@ -607,7 +626,6 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
         return items.map { item ->
             val localAnalytics = analytics[item.id]
             val localInteraction = interactions[item.id]
-            val aiCache = aiCaches[item.id]
             item.copy(
                 isLiked = localInteraction?.isLiked ?: item.isLiked,
                 isCollected = localInteraction?.isCollected ?: item.isCollected,
@@ -616,12 +634,7 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
                 exposureCount = item.exposureCount + (localAnalytics?.exposureCount ?: 0),
                 clickCount = item.clickCount + (localAnalytics?.clickCount ?: 0),
                 shareCount = item.shareCount + (localAnalytics?.shareCount ?: 0),
-                playCount = item.playCount + (localAnalytics?.playCount ?: 0),
-                aiSummary = aiCache?.aiSummary?.takeIf { it.isNotBlank() } ?: item.aiSummary,
-                aiTags = aiCache?.let { parseTagsFromCache(it.aiTags) }
-                    ?.takeIf { it.isNotEmpty() }
-                    ?: item.aiTags,
-                aiReason = aiCache?.aiReason?.takeIf { it.isNotBlank() } ?: item.aiReason
+                playCount = item.playCount + (localAnalytics?.playCount ?: 0)
             )
         }
     }
