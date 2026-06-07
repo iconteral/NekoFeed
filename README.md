@@ -8,6 +8,8 @@ NekoFeed 是一个“内容与广告混排”的 Android 单列信息流项目�
 
 最新发布版本：[`v1.6.1`](https://github.com/iconteral/NekoFeed/releases/tag/v1.6.1)
 
+推荐直接下载最新 Release 包：[`NekoFeed-release.apk`](https://github.com/iconteral/NekoFeed/releases/latest/download/NekoFeed-release.apk)
+
 建议优先下载 Release 版本：Release 包面向正式使用与演示，通常比 Debug 包更稳定，也更不容易出现卡顿；Debug 版本主要用于开发调试。
 
 原始题目与范围见 [Docs/原需求.md](Docs/原需求.md)，技术实现见 [Docs/TECHNICAL_DESIGN.md](Docs/TECHNICAL_DESIGN.md)。
