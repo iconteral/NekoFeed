@@ -111,7 +111,7 @@ class AiSettingsViewModel(application: Application) : AndroidViewModel(applicati
 
     fun testConnection() {
         viewModelScope.launch {
-            saveConfig()
+            saveConfigSilently()
             _uiState.update { it.copy(isTesting = true, testResult = null) }
             Log.d("AiSettingsViewModel", "开始测试连接")
 
@@ -157,5 +157,23 @@ class AiSettingsViewModel(application: Application) : AndroidViewModel(applicati
 
     fun resetSaveSuccess() {
         _uiState.update { it.copy(saveSuccess = false) }
+    }
+
+    private suspend fun saveConfigSilently() {
+        val state = _uiState.value
+        val serverConfig = ServerConfig(
+            baseUrl = state.serverEndpoint.trim().ifEmpty { TokenManager.DEFAULT_SERVER_BASE_URL }
+        )
+        tokenManager.saveServerConfig(serverConfig)
+        RetrofitClient.updateBaseUrl(serverConfig.baseUrl)
+
+        val config = LlmConfig(
+            baseUrl = state.baseUrl.trim(),
+            model = state.model.trim(),
+            apiKey = state.apiKey.trim(),
+            aiEnabled = state.aiEnabled,
+            smartSearchEnabled = state.smartSearchEnabled
+        )
+        tokenManager.saveLlmConfig(config)
     }
 }

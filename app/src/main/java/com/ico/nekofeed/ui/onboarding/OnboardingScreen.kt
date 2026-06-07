@@ -195,7 +195,7 @@ fun OnboardingScreen(
                 HorizontalPager(
                     state = pagerState,
                     modifier = Modifier.weight(1f),
-                    userScrollEnabled = false
+                    userScrollEnabled = true
                 ) { page ->
                     when (page) {
                         0 -> WelcomePage()
