@@ -1,6 +1,5 @@
 package com.ico.nekofeed.ui.feed.components
 
-import android.annotation.SuppressLint
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -62,7 +61,6 @@ import androidx.compose.material3.LinearWavyProgressIndicator
 import com.ico.nekofeed.player.PlayerManager
 import com.ico.nekofeed.player.VideoPlaybackStatus
 
-@SuppressLint("UnsafeOptInUsageError")
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun VideoFeedCard(

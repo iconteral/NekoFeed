@@ -1,95 +1,87 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h1>User Profile: {{ user.username }}</h1>
+<h1>用户详情：{{ user.username }}</h1>
 
 <div class="dashboard-stats">
     <div class="stat-box">
-        <h3>Total Views</h3>
+        <h3>总浏览</h3>
         <div class="number">{{ behavior.total_items_viewed }}</div>
     </div>
     <div class="stat-box">
-        <h3>Total Likes</h3>
+        <h3>总点赞</h3>
         <div class="number">{{ behavior.total_likes }}</div>
     </div>
     <div class="stat-box">
-        <h3>Total Collects</h3>
+        <h3>总收藏</h3>
         <div class="number">{{ behavior.total_collects }}</div>
     </div>
     <div class="stat-box">
-        <h3>Reading Time</h3>
-        <div class="number">{{ (behavior.total_reading_time_seconds / 60)|round(1) }}m</div>
+        <h3>阅读时长</h3>
+        <div class="number">{{ (behavior.total_reading_time_seconds / 60)|round(1) }}分钟</div>
     </div>
 </div>
 
-<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem;">
-    <!-- 兴趣分类饼图 -->
+<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-top: 1.5rem;">
     <div class="card">
-        <h3>Interest Categories (Views)</h3>
-        <canvas id="categoryChart" height="250"></canvas>
+        <h3>兴趣分类（浏览）</h3>
+        <canvas id="categoryChart" height="120"></canvas>
     </div>
-
-    <!-- 内容类型偏好 -->
     <div class="card">
-        <h3>Content Type Preferences</h3>
-        <canvas id="typeChart" height="250"></canvas>
+        <h3>内容类型偏好</h3>
+        <canvas id="typeChart" height="120"></canvas>
     </div>
-
-    <!-- 24小时阅读分布 -->
     <div class="card">
-        <h3>Reading Patterns (24h)</h3>
-        <canvas id="hourChart" height="250"></canvas>
+        <h3>阅读时段分布（24小时）</h3>
+        <canvas id="hourChart" height="120"></canvas>
     </div>
+</div>
 
-    <!-- 参与度指标 -->
+<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-top: 1rem;">
     <div class="card">
-        <h3>Engagement Metrics</h3>
-        <div style="padding: 1rem 0;">
-            <div style="display: flex; justify-content: space-between; padding: 0.8rem 0; border-bottom: 1px solid #eee;">
-                <span>Like Rate</span>
+        <h3>互动指标</h3>
+        <div style="padding: 0.5rem 0; font-size: 0.85rem;">
+            <div style="display: flex; justify-content: space-between; padding: 0.4rem 0; border-bottom: 1px solid #eee;">
+                <span>点赞率</span>
                 <strong>{{ "%.1f"|format(engagement.like_rate * 100) }}%</strong>
             </div>
-            <div style="display: flex; justify-content: space-between; padding: 0.8rem 0; border-bottom: 1px solid #eee;">
-                <span>Collect Rate</span>
+            <div style="display: flex; justify-content: space-between; padding: 0.4rem 0; border-bottom: 1px solid #eee;">
+                <span>收藏率</span>
                 <strong>{{ "%.1f"|format(engagement.collect_rate * 100) }}%</strong>
             </div>
-            <div style="display: flex; justify-content: space-between; padding: 0.8rem 0; border-bottom: 1px solid #eee;">
-                <span>Avg Daily Views</span>
+            <div style="display: flex; justify-content: space-between; padding: 0.4rem 0; border-bottom: 1px solid #eee;">
+                <span>日均浏览</span>
                 <strong>{{ engagement.avg_daily_views }}</strong>
             </div>
-            <div style="display: flex; justify-content: space-between; padding: 0.8rem 0; border-bottom: 1px solid #eee;">
-                <span>Most Engaged Category</span>
-                <strong>{{ engagement.most_engaged_category or "N/A" }}</strong>
+            <div style="display: flex; justify-content: space-between; padding: 0.4rem 0; border-bottom: 1px solid #eee;">
+                <span>最活跃分类</span>
+                <strong>{{ engagement.most_engaged_category or "无" }}</strong>
             </div>
-            <div style="display: flex; justify-content: space-between; padding: 0.8rem 0;">
-                <span>Longest Active Streak</span>
-                <strong>{{ engagement.longest_streak_days }} days</strong>
+            <div style="display: flex; justify-content: space-between; padding: 0.4rem 0;">
+                <span>最长连续活跃</span>
+                <strong>{{ engagement.longest_streak_days }} 天</strong>
             </div>
         </div>
     </div>
-</div>
-
-<!-- 点赞分类 vs 收藏分类 对比 -->
-<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem;">
     <div class="card">
-        <h3>Liked Categories</h3>
-        <canvas id="likedCatChart" height="200"></canvas>
+        <h3>点赞分类</h3>
+        <canvas id="likedCatChart" height="120"></canvas>
     </div>
     <div class="card">
-        <h3>Collected Categories</h3>
-        <canvas id="collectedCatChart" height="200"></canvas>
+        <h3>收藏分类</h3>
+        <canvas id="collectedCatChart" height="120"></canvas>
     </div>
 </div>
 
-<!-- 标签词云（用简单列表展示） -->
+<!-- 标签词云 -->
 <div class="card" style="margin-top: 1.5rem;">
-    <h3>Top Tags</h3>
+    <h3>热门标签</h3>
     <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; padding: 1rem 0;">
         {% for tag in interests.top_tags[:20] %}
         <span class="badge" style="font-size: {{ 0.8 + (tag.count / 10)|round(1) }}rem; padding: 4px 12px;">{{ tag.tag }} ({{ tag.count }})</span>
         {% endfor %}
         {% if not interests.top_tags %}
-        <span style="color: #999;">No tag data yet</span>
+        <span style="color: #999;">暂无标签数据</span>
         {% endif %}
     </div>
 </div>
@@ -97,7 +89,7 @@
 <!-- 最近活动 -->
 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem;">
     <div class="card">
-        <h3>Recent Likes</h3>
+        <h3>最近点赞</h3>
         {% for item in recent_likes[:5] %}
         <div style="padding: 0.5rem 0; border-bottom: 1px solid #eee; font-size: 0.9rem;">
             <div style="font-weight: 500;">{{ item.title[:40] }}{% if item.title|length > 40 %}...{% endif %}</div>
@@ -105,11 +97,11 @@
         </div>
         {% endfor %}
         {% if not recent_likes %}
-        <p style="color: #999;">No likes yet</p>
+        <p style="color: #999;">暂无点赞</p>
         {% endif %}
     </div>
     <div class="card">
-        <h3>Recent Collects</h3>
+        <h3>最近收藏</h3>
         {% for item in recent_collects[:5] %}
         <div style="padding: 0.5rem 0; border-bottom: 1px solid #eee; font-size: 0.9rem;">
             <div style="font-weight: 500;">{{ item.title[:40] }}{% if item.title|length > 40 %}...{% endif %}</div>
@@ -117,19 +109,19 @@
         </div>
         {% endfor %}
         {% if not recent_collects %}
-        <p style="color: #999;">No collects yet</p>
+        <p style="color: #999;">暂无收藏</p>
         {% endif %}
     </div>
     <div class="card">
-        <h3>Recent Views</h3>
+        <h3>最近浏览</h3>
         {% for item in recent_history[:5] %}
         <div style="padding: 0.5rem 0; border-bottom: 1px solid #eee; font-size: 0.9rem;">
             <div style="font-weight: 500;">{{ item.title[:40] }}{% if item.title|length > 40 %}...{% endif %}</div>
-            <div style="color: #999; font-size: 0.8rem;">{{ item.category }} · {{ item.duration }}s</div>
+            <div style="color: #999; font-size: 0.8rem;">{{ item.category }} · {{ item.duration }}秒</div>
         </div>
         {% endfor %}
         {% if not recent_history %}
-        <p style="color: #999;">No views yet</p>
+        <p style="color: #999;">暂无浏览</p>
         {% endif %}
     </div>
 </div>
@@ -137,13 +129,13 @@
 <!-- 每日活动趋势 -->
 {% if behavior.daily_activities %}
 <div class="card" style="margin-top: 1.5rem;">
-    <h3>Daily Activity (Last 30 Days)</h3>
+    <h3>每日活动（近30天）</h3>
     <canvas id="dailyChart" height="150"></canvas>
 </div>
 {% endif %}
 
 <div style="margin-top: 1.5rem;">
-    <a href="/admin/users" class="btn">Back to Users</a>
+    <a href="/admin/users" class="btn">返回用户列表</a>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -189,7 +181,7 @@ makePieChart('typeChart',
 makeBarChart('hourChart',
     {{ reading_patterns|map(attribute='hour')|list|tojson }},
     [{
-        label: 'Views',
+        label: '浏览',
         data: {{ reading_patterns|map(attribute='count')|list|tojson }},
         backgroundColor: '#3498db'
     }]
@@ -214,9 +206,9 @@ new Chart(document.getElementById('dailyChart'), {
     data: {
         labels: {{ behavior.daily_activities|map(attribute='date')|list|tojson }},
         datasets: [
-            { label: 'Views', data: {{ behavior.daily_activities|map(attribute='views')|list|tojson }}, borderColor: '#3498db', fill: false },
-            { label: 'Likes', data: {{ behavior.daily_activities|map(attribute='likes')|list|tojson }}, borderColor: '#e74c3c', fill: false },
-            { label: 'Collects', data: {{ behavior.daily_activities|map(attribute='collects')|list|tojson }}, borderColor: '#2ecc71', fill: false }
+            { label: '浏览', data: {{ behavior.daily_activities|map(attribute='views')|list|tojson }}, borderColor: '#3498db', fill: false },
+            { label: '点赞', data: {{ behavior.daily_activities|map(attribute='likes')|list|tojson }}, borderColor: '#e74c3c', fill: false },
+            { label: '收藏', data: {{ behavior.daily_activities|map(attribute='collects')|list|tojson }}, borderColor: '#2ecc71', fill: false }
         ]
     },
     options: { responsive: true, scales: { y: { beginAtZero: true } } }

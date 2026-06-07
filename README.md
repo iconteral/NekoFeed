@@ -1,6 +1,10 @@
 # NekoFeed
 
+![poster.png](Docs/poster.png)
+
 NekoFeed 是一个“内容与广告混排”的 Android 单列信息流项目。系统由 Jetpack Compose 客户端和 FastAPI 本地 Feed Server 组成：服务端聚合 RSS/Atom 与自定义广告并归一化为统一 `FeedItem`，客户端负责分类浏览、多样式卡片、视频播放、AI 摘要/标签/对话搜索、用户互动和曝光统计。
+
+[视频演示](https://my.feishu.cn/file/TdcJbrKRoozBn2xR4m4csEDKnrf)
 
 原始题目与范围见 [Docs/原需求.md](Docs/原需求.md)，技术实现见 [Docs/TECHNICAL_DESIGN.md](Docs/TECHNICAL_DESIGN.md)。
 
