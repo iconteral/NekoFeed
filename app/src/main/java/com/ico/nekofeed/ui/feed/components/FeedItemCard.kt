@@ -13,47 +13,50 @@ import com.ico.nekofeed.data.model.FeedItem
 import com.ico.nekofeed.util.IntentUtils
 
 // ============================================================================
-// 【UI 层 · 卡片路由组件（策略模式）】
+// 【UI 层 · 卡片路由组件】
 // ============================================================================
 //
-// 📌 这个文件展示了 Compose 中常用的"分发"模式：
-//    根据数据类型，渲染不同的 UI 组件。
+// 📌 这个文件展示了 Compose 的"策略模式"：
+//    根据数据类型（cardType）分发到不同的 UI 组件。
 //
-// 📌 核心逻辑：when (cardType) { ... }
-//    - LARGE_IMAGE → LargeImageFeedCard（大图卡片）
-//    - SMALL_IMAGE → SmallImageFeedCard（小图卡片）
-//    - VIDEO       → VideoFeedCard（视频卡片）
-//    - PRODUCT     → ProductFeedCard（商品卡片）
-//    - TEXT_ONLY    → SmallImageFeedCard（纯文字，复用小图卡片）
+// 📌 when 表达式 + 枚举：
+//    - FeedCardType.fromString(item.cardType) 把字符串转为枚举
+//    - when (cardType) 根据枚举值选择对应的卡片组件
+//    - 编译器会检查是否覆盖了所有枚举值（不需要 else）
 //
-// 📌 这就是"策略模式"的 Compose 版本：
-//    - 数据决定渲染策略
-//    - 每种策略是独立的 Composable
-//    - 添加新卡片类型只需：1. 加枚举值 2. 加 when 分支 3. 写新 Composable
+// 📌 Composable 函数的参数设计：
+//    - item: FeedItem       → 数据（必须）
+//    - onClick: () -> Unit   → 点击回调（lambda）
+//    - onXxxClick: ((String) -> Unit)? = null → 可选回调（nullable lambda）
+//    - modifier: Modifier = Modifier → Compose 标准的修饰符参数
 //
-// 📌 lambda 参数设计：
-//    - onLikeClick: ((String) -> Unit)? = null
-//    - 双重括号 ((String) -> Unit) 是函数类型
-//    - ? = null 表示可选参数
-//    - 这样卡片组件不需要知道"点赞后做什么"，由外部决定
+// 📌 lambda 的两种写法：
+//    - { itemId -> viewModel.toggleLike(itemId) }  → 显式参数
+//    - viewModel::toggleLike                        → 函数引用（等价写法）
 // ====================================================================
 
 /**
- * FeedItemCard —— 信息流卡片路由
+ * FeedItemCard —— Feed 卡片路由
  *
- * 根据 FeedItem.cardType 分发到不同的卡片组件。
- * 外层包一个 Material 3 Card，提供统一的点击、形状和阴影效果。
+ * 这是信息流列表中的"一条内容"的入口组件。
+ * 它根据 cardType 分发到具体的卡片实现：
  *
- * @param item        FeedItem 数据
- * @param onClick     卡片点击（跳转详情页）
- * @param onLikeClick 点赞回调（可选）
+ *    LARGE_IMAGE → LargeImageFeedCard（大图卡片）
+ *    SMALL_IMAGE → SmallImageFeedCard（小图卡片）
+ *    VIDEO       → VideoFeedCard（视频卡片）
+ *    PRODUCT     → ProductFeedCard（商品卡片）
+ *    TEXT_ONLY   → SmallImageFeedCard（纯文字复用小图卡片布局）
+ *
+ * @param item       FeedItem 数据
+ * @param onClick    整个卡片的点击回调（跳转详情页）
+ * @param onLikeClick    点赞回调（可选）
  * @param onCollectClick 收藏回调（可选）
- * @param onShareClick 分享回调（可选）
- * @param onTagClick  标签点击回调（可选）
- * @param isAiEnabled 是否启用 AI 功能
- * @param isPlaying   视频是否正在播放
- * @param onPlaybackStarted 视频开始播放回调
- * @param onMuteToggle 静音切换回调
+ * @param onShareClick   分享回调（可选）
+ * @param onTagClick     标签点击回调（可选，用于标签筛选）
+ * @param isAiEnabled    AI 功能是否启用
+ * @param isPlaying      视频是否在播放（只对 VIDEO 类型有效）
+ * @param onPlaybackStarted 视频开始播放回调（埋点用）
+ * @param onMuteToggle   静音切换回调
  */
 @Composable
 fun FeedItemCard(
@@ -70,10 +73,10 @@ fun FeedItemCard(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    // 把字符串 "large_image" 转为枚举 FeedCardType.LARGE_IMAGE
+    // 把字符串转为枚举（安全转换，未知值返回 LARGE_IMAGE）
     val cardType = FeedCardType.fromString(item.cardType)
 
-    // 分享 lambda：先通知 ViewModel（埋点），再调用系统分享
+    // 分享 lambda：先通知 ViewModel 记录分享事件，再调用系统分享
     val shareItem: (String) -> Unit = { itemId ->
         onShareClick?.invoke(itemId)
         IntentUtils.shareContent(
@@ -84,7 +87,7 @@ fun FeedItemCard(
         )
     }
 
-    // ── 外层 Card：统一的点击和样式 ─────────────────────────────
+    // Card 是 Material 3 的卡片容器组件
     Card(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
@@ -97,7 +100,9 @@ fun FeedItemCard(
             pressedElevation = 4.dp
         )
     ) {
-        // ── when 分发：根据卡片类型渲染不同的 UI ────────────────
+        // ── 核心：when 分发到具体卡片 ──
+        // when 是 Kotlin 的模式匹配表达式
+        // 每个分支调用不同的 Composable 组件
         when (cardType) {
             FeedCardType.LARGE_IMAGE -> LargeImageFeedCard(
                 item = item,
@@ -134,6 +139,7 @@ fun FeedItemCard(
                 onTagClick = onTagClick,
                 isAiEnabled = isAiEnabled
             )
+            // TEXT_ONLY 复用小图卡片的布局（只是没有图片）
             FeedCardType.TEXT_ONLY -> SmallImageFeedCard(
                 item = item,
                 onLikeClick = onLikeClick,

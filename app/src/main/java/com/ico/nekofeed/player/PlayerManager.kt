@@ -23,86 +23,78 @@ import kotlinx.coroutines.flow.asStateFlow
 // 【播放器 · ExoPlayer 单例管理器】
 // ============================================================================
 //
-// 📌 为什么需要一个专门的 PlayerManager？
-//    - ExoPlayer 是重量级对象（占用大量内存和系统资源）
-//    - 列表中有多个视频卡片，但同一时间只能播放一个
-//    - 所以全局只创建一个 ExoPlayer 实例，复用给不同视频
+// 📌 视频播放是 Android 开发中最复杂的部分之一。
+//    本项目用 Media3（ExoPlayer 的 Jetpack 封装）来实现。
 //
-// 📌 关键设计模式：单例（Singleton）
-//    - private constructor: 外部不能 new PlayerManager()
-//    - companion object + getInstance(): 全局只有一个实例
-//    - @Volatile + synchronized: 线程安全的懒初始化
-//    - 这是 Android 中管理全局资源的标准模式
+// 📌 核心设计：
+//    1. 单例模式（companion object + getInstance）
+//       → 整个 App 只有一个播放器实例，避免内存泄漏
+//    2. 状态管理（StateFlow）
+//       → 播放状态变化时自动通知 UI
+//    3. LRU 缓存
+//       → 视频数据缓存到本地，减少重复下载
 //
-// 📌 ExoPlayer 生命周期：
-//    1. play(url) → 设置 MediaItem → prepare() → playWhenReady = true
-//    2. pause()   → 暂停播放
-//    3. release() → 释放所有资源（Activity 销毁时调用）
+// 📌 单例模式（Double-Check Locking）：
+//    @Volatile private var instance: PlayerManager? = null
+//    fun getInstance(context: Context): PlayerManager {
+//        return instance ?: synchronized(this) {
+//            instance ?: PlayerManager(context.applicationContext).also { instance = it }
+//        }
+//    }
+//    - @Volatile: 保证多线程可见性
+//    - synchronized: 保证只创建一个实例
+//    - ?: (Elvis): 如果已存在就直接返回
 //
-// 📌 StateFlow 暴露播放状态：
-//    - UI 层订阅 playbackState，自动更新播放/暂停/错误状态
-//    - 不需要回调函数，数据驱动 UI
+// 📌 播放器生命周期：
+//    IDLE → BUFFERING → READY → PLAYING → (循环)
+//    任何状态 → ERROR（播放失败）
 // ====================================================================
 
-/**
- * 视频播放状态枚举
- */
+/** 视频播放状态枚举 */
 enum class VideoPlaybackStatus {
-    IDLE,      // 空闲（未播放）
-    BUFFERING, // 缓冲中
-    READY,     // 准备就绪
-    PLAYING,   // 播放中
-    ERROR      // 出错
+    IDLE,       // 空闲（未开始或已停止）
+    BUFFERING,  // 缓冲中（加载视频数据）
+    READY,      // 就绪（可以播放）
+    PLAYING,    // 播放中
+    ERROR       // 错误
 }
 
-/**
- * 视频播放状态数据类
- *
- * @param ownerId   当前正在播放的卡片 ID（用于列表中高亮）
- * @param status    播放状态
- * @param errorMessage 错误信息
- */
+/** 视频播放状态数据类 */
 data class VideoPlaybackState(
-    val ownerId: String? = null,
+    val ownerId: String? = null,                       // 当前播放的卡片 ID
     val status: VideoPlaybackStatus = VideoPlaybackStatus.IDLE,
     val errorMessage: String? = null
 )
 
 /**
- * PlayerManager —— 全局单例视频播放管理器
+ * PlayerManager —— 全局视频播放管理器
  *
- * 🔑 单例模式实现（双重检查锁定）：
- *    companion object {
- *        @Volatile private var instance: PlayerManager? = null
- *        fun getInstance(context: Context): PlayerManager {
- *            return instance ?: synchronized(this) {
- *                instance ?: PlayerManager(context.applicationContext).also { instance = it }
- *            }
- *        }
- *    }
- *
- *    - @Volatile: 保证多线程可见性
- *    - synchronized(this): 同一时间只有一个线程能创建实例
- *    - context.applicationContext: 用 Application Context 避免内存泄漏
+ * 使用 private constructor + companion object 实现单例模式。
+ * 好处：
+ *    1. 全局只有一个 ExoPlayer 实例（节省内存和 CPU）
+ *    2. 可以在任何地方通过 getInstance() 获取
+ *    3. 避免多个播放器同时解码（性能杀手）
  */
 @OptIn(UnstableApi::class)
 class PlayerManager private constructor(private val context: Context) {
 
     companion object {
-        // 模拟浏览器 User-Agent，避免某些视频服务器拒绝非浏览器请求
+        // 模拟浏览器 User-Agent，避免某些 CDN 拒绝请求
         private const val BROWSER_USER_AGENT =
             "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 " +
                 "(KHTML, like Gecko) Chrome/125.0 Mobile Safari/537.36"
 
+        // @Volatile: 多线程环境下保证可见性
         @Volatile
         private var instance: PlayerManager? = null
 
         /**
          * 获取 PlayerManager 单例
          *
-         * 双重检查锁定（Double-Checked Locking）：
-         * 第一次检查 → 不加锁，快速返回已有实例
-         * 第二次检查 → 加锁后再次检查，防止多线程重复创建
+         * Double-Check Locking 模式：
+         * 1. 先检查 instance 是否已创建（无锁，快速路径）
+         * 2. 如果未创建，加锁后再检查一次（防止并发创建）
+         * 3. 使用 applicationContext 避免 Activity 泄漏
          */
         fun getInstance(context: Context): PlayerManager {
             return instance ?: synchronized(this) {
@@ -115,10 +107,10 @@ class PlayerManager private constructor(private val context: Context) {
     private var _exoPlayer: ExoPlayer? = null
 
     /**
-     * 懒初始化 ExoPlayer
+     * ExoPlayer 实例（懒加载）
      *
-     * get() 属性访问器：第一次访问 exoPlayer 时才创建实例
-     * 这是 Kotlin 的自定义 getter 语法
+     * get() 是自定义 getter：首次访问时创建播放器
+     * !! 是非空断言：告诉编译器"我确定这不是 null"
      */
     val exoPlayer: ExoPlayer
         get() {
@@ -128,20 +120,20 @@ class PlayerManager private constructor(private val context: Context) {
             return _exoPlayer!!
         }
 
-    private var currentMediaUrl: String? = null
-    private var playbackOwnerId: String? = null
+    private var currentMediaUrl: String? = null   // 当前播放的 URL
+    private var playbackOwnerId: String? = null    // 当前播放的卡片 ID
     private val _playbackError = MutableStateFlow<String?>(null)
     val playbackError: StateFlow<String?> = _playbackError.asStateFlow()
     private val _playbackState = MutableStateFlow(VideoPlaybackState())
     val playbackState: StateFlow<VideoPlaybackState> = _playbackState.asStateFlow()
-    var isMuted: Boolean = true
-        private set  // 外部只能读，不能写（通过 toggleMute() 修改）
+    var isMuted: Boolean = true  // 默认静音（信息流中视频通常静音播放）
+        private set
 
     /**
      * 播放器事件监听器
      *
-     * Player.Listener 是一个接口，用 object : Player.Listener 创建匿名实现
-     * ExoPlayer 在状态变化时回调这些方法
+     * Player.Listener 是 Media3 的回调接口，监听播放状态变化和错误。
+     * object : Player.Listener 创建匿名内部类实现。
      */
     private val playerListener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) {
@@ -168,16 +160,15 @@ class PlayerManager private constructor(private val context: Context) {
     }
 
     /**
-     * 创建 ExoPlayer 实例（带缓存和自定义网络配置）
+     * 创建 ExoPlayer 实例（配置缓存、网络、User-Agent 等）
      *
-     * 配置要点：
-     *    - 100MB LRU 缓存：最近使用的视频数据缓存到本地
-     *    - 自定义 User-Agent：伪装浏览器
-     *    - 跨协议重定向：允许 HTTP → HTTPS 重定向
-     *    - 循环播放：REPEAT_MODE_ONE
+     * 🔑 配置层次：
+     *    HTTP 数据源 → 默认数据源 → 缓存数据源 → MediaSource 工厂 → ExoPlayer
+     *    每一层都负责不同的职责（网络请求、协议转换、缓存、解码）
      */
     private fun createExoPlayer(): ExoPlayer {
-        val cacheSize: Long = 100 * 1024 * 1024 // 100 MB cache
+        // ── 1. 缓存配置 ──────────────────────────────────────────
+        val cacheSize: Long = 100 * 1024 * 1024 // 100 MB LRU 缓存
         val cacheEvictor = LeastRecentlyUsedCacheEvictor(cacheSize)
         val databaseProvider = StandaloneDatabaseProvider(context)
         val cacheDir = File(context.cacheDir, "media3_cache")
@@ -186,6 +177,7 @@ class PlayerManager private constructor(private val context: Context) {
             simpleCache = SimpleCache(cacheDir, cacheEvictor, databaseProvider)
         }
 
+        // ── 2. HTTP 数据源配置 ──────────────────────────────────
         val httpDataSourceFactory = DefaultHttpDataSource.Factory()
             .setUserAgent(BROWSER_USER_AGENT)
             .setAllowCrossProtocolRedirects(true)
@@ -198,25 +190,28 @@ class PlayerManager private constructor(private val context: Context) {
                 )
             )
         val dataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
+
+        // ── 3. 缓存数据源 ──────────────────────────────────────
         val cacheDataSourceFactory = CacheDataSource.Factory()
             .setCache(simpleCache!!)
             .setUpstreamDataSourceFactory(dataSourceFactory)
             .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
 
+        // ── 4. 构建 ExoPlayer ──────────────────────────────────
         return ExoPlayer.Builder(context)
             .setMediaSourceFactory(DefaultMediaSourceFactory(context).setDataSourceFactory(cacheDataSourceFactory))
             .build().apply {
-                repeatMode = Player.REPEAT_MODE_ONE  // 循环播放
+                repeatMode = Player.REPEAT_MODE_ONE  // 单视频循环播放
                 volume = if (isMuted) 0f else 1f     // 默认静音
-                addListener(playerListener)
+                addListener(playerListener)           // 注册状态监听
             }
     }
 
     /**
-     * 播放视频
+     * 开始播放
      *
      * @param mediaUrl 视频 URL
-     * @param ownerId  播放者 ID（用于标识哪个卡片正在播放）
+     * @param ownerId  所属卡片 ID（用于追踪哪个卡片在播放）
      */
     fun play(mediaUrl: String?, ownerId: String? = null) {
         if (mediaUrl.isNullOrBlank()) return
@@ -230,13 +225,13 @@ class PlayerManager private constructor(private val context: Context) {
 
         val player = exoPlayer
         if (currentMediaUrl != mediaUrl) {
-            // 新视频：设置 MediaItem → prepare → playWhenReady
+            // 新视频：设置 MediaItem → 准备 → 播放
             currentMediaUrl = mediaUrl
             val mediaItem = MediaItem.fromUri(mediaUrl)
             player.setMediaItem(mediaItem)
             player.prepare()
         } else if (player.playerError != null || player.playbackState == Player.STATE_IDLE) {
-            // 同一视频但出错了：重新 prepare
+            // 同一视频但有错误：重新准备
             player.prepare()
         }
         player.playWhenReady = true
@@ -245,7 +240,7 @@ class PlayerManager private constructor(private val context: Context) {
     /**
      * 暂停播放
      *
-     * @param ownerId 只有当前播放者才能暂停（防止其他卡片误暂停）
+     * @param ownerId 如果指定，只有当 ownerId 匹配时才暂停（防止误暂停其他卡片的视频）
      */
     fun pause(ownerId: String? = null) {
         if (ownerId != null && playbackOwnerId != ownerId) return
@@ -265,10 +260,10 @@ class PlayerManager private constructor(private val context: Context) {
     }
 
     /**
-     * 释放所有资源
+     * 释放播放器资源
      *
-     * 在 Application.onTerminate() 或不再需要时调用
-     * ExoPlayer 和 SimpleCache 都需要手动释放
+     * ⚠️ 必须在不需要播放器时调用，否则会内存泄漏！
+     * 本项目因为是单例，通常在 App 退出时才释放。
      */
     fun release() {
         _exoPlayer?.release()
@@ -279,6 +274,6 @@ class PlayerManager private constructor(private val context: Context) {
         playbackOwnerId = null
         _playbackError.value = null
         _playbackState.value = VideoPlaybackState()
-        instance = null  // 清除单例引用
+        instance = null
     }
 }

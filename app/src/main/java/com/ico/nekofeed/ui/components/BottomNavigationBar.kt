@@ -37,42 +37,45 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 // ============================================================================
-// 【UI 层 · 底部导航栏组件】
+// 【UI 层 · 底部导航栏】
 // ============================================================================
 //
-// 📌 这个文件展示了 Compose 的几个核心模式：
+// 📌 这个文件展示了 Compose 的几个重要模式：
 //
-//    1. sealed class（密封类）:
-//       - 比 enum class 更灵活：每个子类可以有不同的属性
+//    1. sealed class（密封类）：
+//       - 限制类的子类只能在同一个文件中定义
 //       - 编译器知道所有可能的子类，when 不需要 else
-//       - data object 代替 data class（单例，不需要多个实例）
+//       - 比 enum 更灵活：每个子类可以有不同的属性和方法
 //
-//    2. Material 3 组件：
-//       - NavigationBar: Material 3 底部导航栏
-//       - NavigationBarItem: 单个导航项
-//       - AnimatedContent: 内容切换动画
+//    2. data object（数据对象）：
+//       - Kotlin 1.9+ 语法，类似 data class 但用于 object
+//       - 每个 object 是单例，适合定义固定的选项集
 //
-//    3. 图标状态切换：
-//       - 选中时用 Filled 图标，未选中时用 Outlined 图标
-//       - AnimatedContent 实现平滑的图标切换动画
+//    3. AnimatedContent：
+//       - Compose 的内容切换动画组件
+//       - 当 targetState 变化时，旧内容退出 + 新内容进入
+//
+//    4. Material 3 NavigationBar：
+//       - Material Design 3 的底部导航栏组件
+//       - NavigationBarItem 是每个 Tab
 // ====================================================================
 
 /**
- * BottomNavItem —— 底部导航项（密封类）
+ * BottomNavItem —— 底部导航栏的项目定义
  *
- * 🔑 sealed class vs enum class：
- *    - enum: 每个实例完全相同，只有 name 和 ordinal
- *    - sealed: 每个子类可以有不同属性（route, label, selectedIcon, unselectedIcon）
+ * sealed class 限制只有这 4 个子类（Home / Chat / Stats / Profile）。
+ * 每个子类定义了：路由名、标签、选中图标、未选中图标。
  *
- * 🔑 data object vs data class：
- *    - data class: 可以有多个实例（如 FeedItem("1"), FeedItem("2")）
- *    - data object: 只有一个实例（单例），适合表示固定常量
+ * 🔑 sealed class vs enum：
+ *    - enum: 所有实例共享相同的属性结构
+ *    - sealed class: 每个子类可以有不同的属性和行为
+ *    - 本项目中每个 Tab 的图标不同，用 sealed class 更合适
  */
 sealed class BottomNavItem(
-    val route: String,                // 路由名（与 NavHost 中的 composable("xxx") 对应）
-    val label: String,                // 显示文字
-    val selectedIcon: ImageVector,    // 选中时的图标
-    val unselectedIcon: ImageVector   // 未选中时的图标
+    val route: String,                    // 路由名（与 NavHost 中的 composable("xxx") 对应）
+    val label: String,                    // 显示文字
+    val selectedIcon: ImageVector,        // 选中时的图标（实心）
+    val unselectedIcon: ImageVector       // 未选中时的图标（空心）
 ) {
     data object Home : BottomNavItem(
         route = "feed",
@@ -103,7 +106,7 @@ sealed class BottomNavItem(
     )
 }
 
-/** 底部导航项列表（顺序决定显示顺序） */
+/** 底部导航栏项目列表（按显示顺序） */
 val bottomNavItems = listOf(
     BottomNavItem.Home,
     BottomNavItem.Chat,
@@ -112,22 +115,13 @@ val bottomNavItems = listOf(
 )
 
 /**
- * 底部导航栏 Composable
+ * NekoFeedBottomNavigationBar —— 底部导航栏 Composable
  *
- * @param currentRoute 当前路由（用于高亮选中项）
- * @param onNavigate   点击导航项的回调
+ * @param currentRoute 当前路由（用于高亮选中的 Tab）
+ * @param onNavigate   Tab 点击回调（传入路由名）
  *
- * 🔑 Material 3 NavigationBar 的用法：
- *    NavigationBar {                    // 容器
- *        items.forEach { item ->        // 遍历导航项
- *            NavigationBarItem(         // 单个导航项
- *                selected = isSelected, // 是否选中
- *                onClick = { ... },     // 点击回调
- *                icon = { ... },        // 图标
- *                label = { ... }        // 文字
- *            )
- *        }
- *    }
+ * 🔑 Composable 函数命名约定：大写开头（PascalCase）
+ *    普通函数用小写开头（camelCase）
  */
 @Composable
 fun NekoFeedBottomNavigationBar(
@@ -141,6 +135,7 @@ fun NekoFeedBottomNavigationBar(
         tonalElevation = 8.dp
     ) {
         bottomNavItems.forEach { item ->
+            // 判断当前 Tab 是否选中
             val isSelected = currentRoute == item.route ||
                 (item.route == "feed" && currentRoute.startsWith("feed"))
 
@@ -148,8 +143,8 @@ fun NekoFeedBottomNavigationBar(
                 selected = isSelected,
                 onClick = { onNavigate(item.route) },
                 icon = {
-                    // ── AnimatedContent: 图标切换动画 ─────────────
-                    // 当 isSelected 变化时，旧图标淡出 + 缩小，新图标淡入 + 放大
+                    // ── AnimatedContent：图标切换动画 ──
+                    // 当 isSelected 变化时，图标会播放缩放 + 淡入淡出动画
                     AnimatedContent(
                         targetState = isSelected,
                         transitionSpec = {
@@ -178,7 +173,7 @@ fun NekoFeedBottomNavigationBar(
                         fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
                     )
                 },
-                // ── 导航项颜色配置 ─────────────────────────────────
+                // ── Material 3 颜色配置 ──
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = MaterialTheme.colorScheme.primary,
                     selectedTextColor = MaterialTheme.colorScheme.primary,
