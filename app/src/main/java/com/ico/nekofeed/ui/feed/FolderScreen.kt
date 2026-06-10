@@ -1,5 +1,46 @@
 package com.ico.nekofeed.ui.feed
 
+// ============================================================================
+// 【UI 层 · 首页信息流主屏幕（Compose 核心）】
+// ============================================================================
+//
+// 📌 这是整个项目最大的 Composable 文件，包含首页的所有 UI 逻辑。
+//
+// 📌 Compose 核心知识点（本文件涉及的）：
+//
+//    1. @Composable 函数 → 类似 XML 布局，但是用 Kotlin 代码写 UI
+//       - 没有 findViewById，没有 XML，纯代码
+//       - 数据变化时自动重新调用（重组 Recomposition）
+//
+//    2. 状态订阅 → val uiState by viewModel.uiState.collectAsState()
+//       - by 是属性委托语法
+//       - collectAsState() 把 Flow 转成 State，数据变化时触发重组
+//
+//    3. LaunchedEffect(key) → 在 Composable 生命周期内启动协程
+//       - key 变化时重新执行
+//       - 适合做一次性操作（加载数据、监听事件）
+//
+//    4. LazyColumn → 高性能列表（类似 RecyclerView）
+//       - items(list, key, contentType) 声明数据源
+//       - key: 稳定的 item key，帮助 Compose 正确复用
+//       - contentType: 帮助 Compose 选择正确的 Composable
+//
+//    5. HorizontalPager → 横向翻页（类似 ViewPager）
+//       - rememberPagerState 管理页面状态
+//       - 配合 TabRow 实现"频道切换"
+//
+//    6. snapshotFlow → 把 Compose 的 State 转为 Flow
+//       - 用于监听 LazyColumn 的滚动状态
+//       - distinctUntilChanged() 去重，避免重复触发
+//
+//    7. DisposableEffect → 可清理的副作用
+//       - onDispose {} 里清理资源（如移除监听器）
+//       - 生命周期结束时自动调用
+//
+//    8. remember / rememberUpdatedState → 缓存和更新引用
+//       - remember: 跨重组缓存值（不随重组重新创建）
+//       - rememberUpdatedState: 在 LaunchedEffect 中引用最新的回调
+// ====================================================================
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -571,7 +612,10 @@ private fun FeedContent(
     onPlayingItemChange: (String?) -> Unit,
     playingItemId: String?
 ) {
-    // Infinite scroll detection: trigger loadMore when scrolled near the bottom
+    // ── 无限滚动检测 ─────────────────────────────────────────────
+    // snapshotFlow: 把 Compose 的 State 转为 Kotlin Flow
+    // 当最后可见 item 接近总数时，触发 loadMore()
+    // 这是"无限滚动"（Infinite Scroll）的标准实现方式
     LaunchedEffect(listState) {
         snapshotFlow {
             val layoutInfo = listState.layoutInfo
@@ -622,9 +666,12 @@ private fun FeedContent(
     val currentOnExposure by rememberUpdatedState(onExposure)
     val currentOnAiRequest by rememberUpdatedState(onAiRequest)
 
-    // Expensive viewport work runs only after scrolling has fully stopped. This
-    // avoids creating PlayerView, starting playback, and scheduling AI work while
-    // LazyColumn is trying to meet frame deadlines.
+    // ── 视口计算：曝光埋点 + 视频自动播放 + AI 请求 ──────────────
+    // 等滚动完全停止后（delay 1 秒），才执行以下昂贵操作：
+    // 1. 曝光：计算可见像素 >= 50% 的 item，记录曝光事件
+    // 2. 视频：找到离视口中心最近的视频 item，自动播放
+    // 3. AI：找到离视口中心最近的 item，触发 AI 分析
+    // 为什么要等滚动停止？因为滚动中做这些操作会影响帧率
     LaunchedEffect(listState, isAiEnabled, isLifecycleResumed) {
         if (!isLifecycleResumed) return@LaunchedEffect
 

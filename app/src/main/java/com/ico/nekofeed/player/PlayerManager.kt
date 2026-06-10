@@ -19,24 +19,77 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+// ============================================================================
+// 【播放器 · ExoPlayer 单例管理器】
+// ============================================================================
+//
+// 📌 为什么需要一个专门的 PlayerManager？
+//    - ExoPlayer 是重量级对象（占用大量内存和系统资源）
+//    - 列表中有多个视频卡片，但同一时间只能播放一个
+//    - 所以全局只创建一个 ExoPlayer 实例，复用给不同视频
+//
+// 📌 关键设计模式：单例（Singleton）
+//    - private constructor: 外部不能 new PlayerManager()
+//    - companion object + getInstance(): 全局只有一个实例
+//    - @Volatile + synchronized: 线程安全的懒初始化
+//    - 这是 Android 中管理全局资源的标准模式
+//
+// 📌 ExoPlayer 生命周期：
+//    1. play(url) → 设置 MediaItem → prepare() → playWhenReady = true
+//    2. pause()   → 暂停播放
+//    3. release() → 释放所有资源（Activity 销毁时调用）
+//
+// 📌 StateFlow 暴露播放状态：
+//    - UI 层订阅 playbackState，自动更新播放/暂停/错误状态
+//    - 不需要回调函数，数据驱动 UI
+// ====================================================================
+
+/**
+ * 视频播放状态枚举
+ */
 enum class VideoPlaybackStatus {
-    IDLE,
-    BUFFERING,
-    READY,
-    PLAYING,
-    ERROR
+    IDLE,      // 空闲（未播放）
+    BUFFERING, // 缓冲中
+    READY,     // 准备就绪
+    PLAYING,   // 播放中
+    ERROR      // 出错
 }
 
+/**
+ * 视频播放状态数据类
+ *
+ * @param ownerId   当前正在播放的卡片 ID（用于列表中高亮）
+ * @param status    播放状态
+ * @param errorMessage 错误信息
+ */
 data class VideoPlaybackState(
     val ownerId: String? = null,
     val status: VideoPlaybackStatus = VideoPlaybackStatus.IDLE,
     val errorMessage: String? = null
 )
 
+/**
+ * PlayerManager —— 全局单例视频播放管理器
+ *
+ * 🔑 单例模式实现（双重检查锁定）：
+ *    companion object {
+ *        @Volatile private var instance: PlayerManager? = null
+ *        fun getInstance(context: Context): PlayerManager {
+ *            return instance ?: synchronized(this) {
+ *                instance ?: PlayerManager(context.applicationContext).also { instance = it }
+ *            }
+ *        }
+ *    }
+ *
+ *    - @Volatile: 保证多线程可见性
+ *    - synchronized(this): 同一时间只有一个线程能创建实例
+ *    - context.applicationContext: 用 Application Context 避免内存泄漏
+ */
 @OptIn(UnstableApi::class)
 class PlayerManager private constructor(private val context: Context) {
 
     companion object {
+        // 模拟浏览器 User-Agent，避免某些视频服务器拒绝非浏览器请求
         private const val BROWSER_USER_AGENT =
             "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 " +
                 "(KHTML, like Gecko) Chrome/125.0 Mobile Safari/537.36"
@@ -44,6 +97,13 @@ class PlayerManager private constructor(private val context: Context) {
         @Volatile
         private var instance: PlayerManager? = null
 
+        /**
+         * 获取 PlayerManager 单例
+         *
+         * 双重检查锁定（Double-Checked Locking）：
+         * 第一次检查 → 不加锁，快速返回已有实例
+         * 第二次检查 → 加锁后再次检查，防止多线程重复创建
+         */
         fun getInstance(context: Context): PlayerManager {
             return instance ?: synchronized(this) {
                 instance ?: PlayerManager(context.applicationContext).also { instance = it }
@@ -53,7 +113,13 @@ class PlayerManager private constructor(private val context: Context) {
 
     private var simpleCache: SimpleCache? = null
     private var _exoPlayer: ExoPlayer? = null
-    
+
+    /**
+     * 懒初始化 ExoPlayer
+     *
+     * get() 属性访问器：第一次访问 exoPlayer 时才创建实例
+     * 这是 Kotlin 的自定义 getter 语法
+     */
     val exoPlayer: ExoPlayer
         get() {
             if (_exoPlayer == null) {
@@ -69,8 +135,14 @@ class PlayerManager private constructor(private val context: Context) {
     private val _playbackState = MutableStateFlow(VideoPlaybackState())
     val playbackState: StateFlow<VideoPlaybackState> = _playbackState.asStateFlow()
     var isMuted: Boolean = true
-        private set
+        private set  // 外部只能读，不能写（通过 toggleMute() 修改）
 
+    /**
+     * 播放器事件监听器
+     *
+     * Player.Listener 是一个接口，用 object : Player.Listener 创建匿名实现
+     * ExoPlayer 在状态变化时回调这些方法
+     */
     private val playerListener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) {
             val status = when {
@@ -95,6 +167,15 @@ class PlayerManager private constructor(private val context: Context) {
         }
     }
 
+    /**
+     * 创建 ExoPlayer 实例（带缓存和自定义网络配置）
+     *
+     * 配置要点：
+     *    - 100MB LRU 缓存：最近使用的视频数据缓存到本地
+     *    - 自定义 User-Agent：伪装浏览器
+     *    - 跨协议重定向：允许 HTTP → HTTPS 重定向
+     *    - 循环播放：REPEAT_MODE_ONE
+     */
     private fun createExoPlayer(): ExoPlayer {
         val cacheSize: Long = 100 * 1024 * 1024 // 100 MB cache
         val cacheEvictor = LeastRecentlyUsedCacheEvictor(cacheSize)
@@ -125,12 +206,18 @@ class PlayerManager private constructor(private val context: Context) {
         return ExoPlayer.Builder(context)
             .setMediaSourceFactory(DefaultMediaSourceFactory(context).setDataSourceFactory(cacheDataSourceFactory))
             .build().apply {
-                repeatMode = Player.REPEAT_MODE_ONE
-                volume = if (isMuted) 0f else 1f
+                repeatMode = Player.REPEAT_MODE_ONE  // 循环播放
+                volume = if (isMuted) 0f else 1f     // 默认静音
                 addListener(playerListener)
             }
     }
 
+    /**
+     * 播放视频
+     *
+     * @param mediaUrl 视频 URL
+     * @param ownerId  播放者 ID（用于标识哪个卡片正在播放）
+     */
     fun play(mediaUrl: String?, ownerId: String? = null) {
         if (mediaUrl.isNullOrBlank()) return
 
@@ -140,19 +227,26 @@ class PlayerManager private constructor(private val context: Context) {
             ownerId = ownerId,
             status = VideoPlaybackStatus.BUFFERING
         )
-        
+
         val player = exoPlayer
         if (currentMediaUrl != mediaUrl) {
+            // 新视频：设置 MediaItem → prepare → playWhenReady
             currentMediaUrl = mediaUrl
             val mediaItem = MediaItem.fromUri(mediaUrl)
             player.setMediaItem(mediaItem)
             player.prepare()
         } else if (player.playerError != null || player.playbackState == Player.STATE_IDLE) {
+            // 同一视频但出错了：重新 prepare
             player.prepare()
         }
         player.playWhenReady = true
     }
 
+    /**
+     * 暂停播放
+     *
+     * @param ownerId 只有当前播放者才能暂停（防止其他卡片误暂停）
+     */
     fun pause(ownerId: String? = null) {
         if (ownerId != null && playbackOwnerId != ownerId) return
 
@@ -170,6 +264,12 @@ class PlayerManager private constructor(private val context: Context) {
         setMute(!isMuted)
     }
 
+    /**
+     * 释放所有资源
+     *
+     * 在 Application.onTerminate() 或不再需要时调用
+     * ExoPlayer 和 SimpleCache 都需要手动释放
+     */
     fun release() {
         _exoPlayer?.release()
         _exoPlayer = null
@@ -179,6 +279,6 @@ class PlayerManager private constructor(private val context: Context) {
         playbackOwnerId = null
         _playbackError.value = null
         _playbackState.value = VideoPlaybackState()
-        instance = null
+        instance = null  // 清除单例引用
     }
 }
