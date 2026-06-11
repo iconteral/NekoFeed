@@ -55,6 +55,7 @@ import coil.compose.AsyncImage
 import com.ico.nekofeed.data.model.FeedItem
 import com.ico.nekofeed.ui.components.SparklesIcon
 import androidx.compose.material3.LinearWavyProgressIndicator
+import androidx.compose.ui.tooling.preview.Preview
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -404,3 +405,39 @@ private fun formatCount(count: Int): String {
 }
 
 private fun Float.format(digits: Int) = "%.${digits}f".format(this)
+
+@Preview(showBackground = true, widthDp = 380)
+@Composable
+private fun ProductFeedCardPreview() {
+    val sampleItem = FeedItem(
+        id = "1",
+        title = "NekoEar Pro 旗舰无线降噪耳机",
+        summary = "最新一代混合主动降噪，40小时超长续航，支持高解析度无线音频。",
+        content = null,
+        sourceName = "NekoStore",
+        sourceUrl = "https://example.com/product",
+        category = null,
+        itemType = "product",
+        cardType = "product",
+        imageUrl = null,
+        mediaUrl = null,
+        tags = listOf("降噪耳机", "数码", "影音"),
+        aiSummary = "NekoEar Pro 降噪深度达 48dB，音质还原度极高，是 2024 年最值得买的耳机。",
+        aiTags = listOf("无线耳机", "主动降噪", "Hi-Res"),
+        isLiked = false,
+        likeCount = 998,
+        isCollected = true,
+        collectCount = 120,
+        brand = "NekoTech",
+        priceText = "¥1,299",
+        ctaText = "立即购买",
+        publishedAt = "2024-01-15",
+        isSponsored = true
+    )
+
+    MaterialTheme {
+        Box(modifier = Modifier.padding(16.dp)) {
+            ProductFeedCard(item = sampleItem)
+        }
+    }
+}

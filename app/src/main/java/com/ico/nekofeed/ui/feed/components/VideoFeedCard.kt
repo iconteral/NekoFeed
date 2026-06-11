@@ -60,6 +60,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LinearWavyProgressIndicator
 import com.ico.nekofeed.player.PlayerManager
 import com.ico.nekofeed.player.VideoPlaybackStatus
+import androidx.compose.ui.tooling.preview.Preview
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -465,3 +466,39 @@ private fun formatCount(count: Int): String {
 }
 
 private fun Float.format(digits: Int) = "%.${digits}f".format(this)
+
+@Preview(showBackground = true, widthDp = 380)
+@Composable
+private fun VideoFeedCardPreview() {
+    val sampleItem = FeedItem(
+        id = "1",
+        title = "猫咪的日常：超治愈小猫咪玩耍日常记录",
+        summary = "来看看这只超级可爱的小猫咪是如何度过它的一天的，充满了温馨和治愈的瞬间。",
+        content = null,
+        sourceName = "萌宠大本营",
+        sourceUrl = null,
+        category = null,
+        itemType = "video",
+        cardType = "video",
+        imageUrl = null,
+        mediaUrl = "https://example.com/video.mp4",
+        tags = listOf("猫咪", "治愈", "萌宠"),
+        aiSummary = "超治愈的可爱小猫咪日常精彩集锦，带给你一整天的快乐。",
+        aiTags = listOf("萌宠", "小猫", "治愈系视频"),
+        isLiked = true,
+        likeCount = 8864,
+        isCollected = true,
+        collectCount = 2390,
+        brand = "萌物工作室",
+        publishedAt = "2024-01-15"
+    )
+
+    MaterialTheme {
+        Column(modifier = Modifier.padding(16.dp)) {
+            VideoFeedCard(
+                item = sampleItem,
+                isPlaying = false
+            )
+        }
+    }
+}

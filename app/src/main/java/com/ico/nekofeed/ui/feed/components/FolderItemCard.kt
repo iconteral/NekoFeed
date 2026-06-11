@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import androidx.compose.ui.tooling.preview.Preview
 import com.ico.nekofeed.data.model.FeedItem
 
 @Composable
@@ -206,6 +207,50 @@ private fun SourceAndTags(item: FeedItem) {
                 text = item.tags.joinToString(" ") { "#$it" },
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, widthDp = 360)
+@Composable
+private fun FolderFeedItemCardPreview() {
+    val sampleItem = FeedItem(
+        id = "1",
+        title = "探索未来：2024年AI技术趋势深度解析与行业展望",
+        summary = "人工智能正在以前所未有的速度改变我们的生活和工作方式。",
+        content = null,
+        sourceName = "科技日报",
+        sourceUrl = null,
+        category = null,
+        itemType = "article",
+        cardType = "large_image",
+        imageUrl = null,
+        mediaUrl = null,
+        tags = listOf("AI", "科技", "趋势"),
+        aiSummary = "2024年AI发展呈现多模态融合、边缘计算普及、行业垂直深耕三大趋势。",
+        aiTags = listOf("AI", "多模态", "边缘计算"),
+        isLiked = true,
+        likeCount = 2356,
+        isCollected = false,
+        collectCount = 189,
+        publishedAt = "2024-01-15"
+    )
+
+    MaterialTheme {
+        Column(modifier = Modifier.padding(16.dp)) {
+            FeedItemCard(
+                item = sampleItem,
+                onClick = {}
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            FeedItemCard(
+                item = sampleItem.copy(
+                    id = "2",
+                    cardType = "small_image",
+                    title = "Kotlin 2.0 带来了全新的 K2 编译器"
+                ),
+                onClick = {}
             )
         }
     }

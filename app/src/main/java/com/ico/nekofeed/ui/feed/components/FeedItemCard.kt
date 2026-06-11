@@ -1,6 +1,10 @@
 package com.ico.nekofeed.ui.feed.components
 
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -8,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.tooling.preview.Preview
 import com.ico.nekofeed.data.model.FeedCardType
 import com.ico.nekofeed.data.model.FeedItem
 import com.ico.nekofeed.util.IntentUtils
@@ -147,6 +152,52 @@ fun FeedItemCard(
                 onShareClick = shareItem,
                 onTagClick = onTagClick,
                 isAiEnabled = isAiEnabled
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, widthDp = 360)
+@Composable
+fun FeedItemCardPreview() {
+    val sampleItem = FeedItem(
+        id = "1",
+        title = "探索未来：2024年AI技术趋势深度解析与行业展望",
+        summary = "人工智能正在以前所未有的速度改变我们的生活和工作方式。",
+        content = null,
+        sourceName = "科技日报",
+        sourceUrl = null,
+        category = null,
+        itemType = "article",
+        cardType = "large_image",
+        imageUrl = null,
+        mediaUrl = null,
+        tags = listOf("AI", "科技", "趋势"),
+        aiSummary = "2024年AI发展呈现多模态融合、边缘计算普及、行业垂直深耕三大趋势。",
+        aiTags = listOf("AI", "多模态", "边缘计算"),
+        isLiked = true,
+        likeCount = 2356,
+        isCollected = false,
+        collectCount = 189,
+        publishedAt = "2024-01-15"
+    )
+
+    MaterialTheme {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // 大图卡片预览
+            FeedItemCard(
+                item = sampleItem,
+                onClick = {}
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            // 小图卡片预览
+            FeedItemCard(
+                item = sampleItem.copy(
+                    id = "2",
+                    cardType = "small_image",
+                    title = "Kotlin 2.0 带来更高效率与更快编译速度"
+                ),
+                onClick = {}
             )
         }
     }

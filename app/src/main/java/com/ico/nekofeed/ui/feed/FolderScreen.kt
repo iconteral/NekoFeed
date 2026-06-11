@@ -898,3 +898,48 @@ fun FeedScreenPreview() {
         )
     }
 }
+
+@Preview(showBackground = true)
+@Composable
+fun FeedTagFilterPreview() {
+    MaterialTheme {
+        Box(modifier = Modifier.padding(16.dp)) {
+            FeedTagFilter(
+                availableTags = listOf("科技", "AI", "手机", "商业", "游戏"),
+                selectedTags = listOf("科技", "AI"),
+                onTagClick = {},
+                onClearTags = {}
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun FeedTabRowPreview() {
+    MaterialTheme {
+        FeedTabRow(
+            selectedCategory = FeedCategory.FEATURED,
+            onCategorySelected = {}
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun FeedLoadingContentPreview() {
+    MaterialTheme {
+        FeedLoadingContent()
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun ErrorContentPreview() {
+    MaterialTheme {
+        ErrorContent(
+            message = "连接超时，请检查您的网络连接后再试",
+            onRetry = {}
+        )
+    }
+}
